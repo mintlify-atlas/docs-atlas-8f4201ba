@@ -1,0 +1,353 @@
+---
+title: "Render Utilities"
+description: "Utilities for rendering ESP, boxes, lines, and custom overlays"
+---
+
+## Overview
+
+LiquidBounce provides comprehensive rendering utilities for creating ESP (Extra Sensory Perception), overlays, boxes, lines, and other visual enhancements.
+
+**Package:** `net.ccbluex.liquidbounce.render`
+
+## Core Render Components
+
+### RenderEngine
+
+The main rendering engine that handles all drawing operations.
+
+```kotlin
+object RenderEngine
+```
+
+### Environment Renderer
+
+Handles world-space rendering:
+
+```kotlin
+object EnvironmentRenderer
+```
+
+## Rendering in World
+
+### WorldRenderEvent
+
+```kotlin
+private val renderHandler = handler<WorldRenderEvent> { event ->
+    val matrixStack = event.matrixStack
+    val partialTicks = event.partialTicks
+    
+    // Render in world
+    renderBox(matrixStack, targetPos, Color4b(255, 0, 0, 100))
+}
+```
+
+### Drawing Boxes
+
+```kotlin
+fun drawBox(
+    matrixStack: PoseStack,
+    box: Box,
+    color: Color4b,
+    filled: Boolean = true,
+    outlined: Boolean = true
+)
+```
+
+**Example:**
+```kotlin
+val box = Box(
+    x1 = pos.x,
+    y1 = pos.y,
+    z1 = pos.z,
+    x2 = pos.x + 1.0,
+    y2 = pos.y + 1.0,
+    z2 = pos.z + 1.0
+)
+
+drawBox(
+    matrixStack,
+    box,
+    Color4b(255, 0, 0, 100),
+    filled = true,
+    outlined = true
+)
+```
+
+### Drawing Lines
+
+```kotlin
+fun drawLine(
+    matrixStack: PoseStack,
+    from: Vec3,
+    to: Vec3,
+    color: Color4b,
+    width: Float = 2.0f
+)
+```
+
+**Example:**
+```kotlin
+// Draw tracer from player to entity
+val from = player.getEyePosition(partialTicks)
+val to = entity.getPosition(partialTicks)
+
+drawLine(matrixStack, from, to, Color4b(255, 255, 255, 200), 2.0f)
+```
+
+### Drawing Entity Boxes
+
+```kotlin
+fun drawEntityBox(
+    matrixStack: PoseStack,
+    entity: Entity,
+    color: Color4b,
+    partialTicks: Float
+)
+```
+
+**Example:**
+```kotlin
+for (entity in world.entities()) {
+    if (entity is Player && entity != player) {
+        drawEntityBox(matrixStack, entity, Color4b(0, 255, 0, 100), partialTicks)
+    }
+}
+```
+
+## Overlay Rendering
+
+### OverlayRenderEvent
+
+```kotlin
+private val overlayHandler = handler<OverlayRenderEvent> { event ->
+    val context = event.context
+    val tickDelta = event.tickDelta
+    
+    // Render HUD elements
+    drawText(context, "Example Text", 10, 10, Color4b.WHITE)
+}
+```
+
+### Drawing Text
+
+```kotlin
+fun drawText(
+    context: GuiGraphics,
+    text: String,
+    x: Int,
+    y: Int,
+    color: Color4b,
+    shadow: Boolean = true
+)
+```
+
+**Example:**
+```kotlin
+drawText(
+    context,
+    "Health: ${player.health}",
+    10,
+    20,
+    Color4b(255, 255, 255, 255),
+    shadow = true
+)
+```
+
+### Drawing Rectangles
+
+```kotlin
+fun drawRect(
+    context: GuiGraphics,
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int,
+    color: Color4b
+)
+```
+
+**Example:**
+```kotlin
+// Draw background
+drawRect(context, 5, 5, 200, 100, Color4b(0, 0, 0, 128))
+
+// Draw border
+drawRectOutline(context, 5, 5, 200, 100, Color4b(255, 255, 255, 255), 2)
+```
+
+### Drawing Images
+
+```kotlin
+fun drawTexture(
+    context: GuiGraphics,
+    texture: ResourceLocation,
+    x: Int,
+    y: Int,
+    width: Int,
+    height: Int
+)
+```
+
+## Color System
+
+### Color4b Class
+
+```kotlin
+data class Color4b(
+    val r: Int,
+    val g: Int,
+    val b: Int,
+    val a: Int = 255
+)
+```
+
+**Common Colors:**
+```kotlin
+Color4b.WHITE   // (255, 255, 255, 255)
+Color4b.BLACK   // (0, 0, 0, 255)
+Color4b.RED     // (255, 0, 0, 255)
+Color4b.GREEN   // (0, 255, 0, 255)
+Color4b.BLUE    // (0, 0, 255, 255)
+Color4b.YELLOW  // (255, 255, 0, 255)
+```
+
+**Custom Colors:**
+```kotlin
+val customColor = Color4b(128, 0, 255, 200) // Purple with transparency
+
+// From hex
+val hexColor = Color4b.fromHex("#FF00FF")
+
+// With alpha
+val transparent = Color4b(255, 0, 0, 100) // Semi-transparent red
+```
+
+## ESP Examples
+
+### Player ESP
+
+```kotlin
+object ModulePlayerESP : ClientModule(...) {
+    val color by color("Color", Color4b(255, 0, 0, 100))
+    val box by boolean("Box", true)
+    val tracers by boolean("Tracers", true)
+    
+    private val renderHandler = handler<WorldRenderEvent> { event ->
+        for (entity in world.players()) {
+            if (entity == player) continue
+            
+            if (box) {
+                drawEntityBox(
+                    event.matrixStack,
+                    entity,
+                    color,
+                    event.partialTicks
+                )
+            }
+            
+            if (tracers) {
+                val from = player.getEyePosition(event.partialTicks)
+                val to = entity.getPosition(event.partialTicks)
+                drawLine(event.matrixStack, from, to, color)
+            }
+        }
+    }
+}
+```
+
+### Block ESP
+
+```kotlin
+object ModuleBlockESP : ClientModule(...) {
+    val blocks by blocks("Blocks", hashSetOf(Blocks.DIAMOND_ORE))
+    
+    private val renderHandler = handler<WorldRenderEvent> { event ->
+        val range = 50
+        val playerPos = player.blockPosition()
+        
+        for (x in -range..range) {
+            for (y in -range..range) {
+                for (z in -range..range) {
+                    val pos = playerPos.offset(x, y, z)
+                    val block = world.getBlockState(pos).block
+                    
+                    if (block in blocks) {
+                        drawBox(
+                            event.matrixStack,
+                            Box.fromBlockPos(pos),
+                            Color4b(255, 0, 0, 100)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+### Nametags
+
+```kotlin
+object ModuleNametags : ClientModule(...) {
+    private val renderHandler = handler<WorldRenderEvent> { event ->
+        for (entity in world.players()) {
+            if (entity == player) continue
+            
+            val pos = entity.getPosition(event.partialTicks)
+                .add(0.0, entity.eyeHeight + 0.5, 0.0)
+            
+            renderNametagAtPosition(
+                event.matrixStack,
+                pos,
+                entity.name.string,
+                Color4b.WHITE
+            )
+        }
+    }
+}
+```
+
+## Performance Optimization
+
+### Batch Rendering
+
+```kotlin
+beginBatch()
+for (entity in entities) {
+    drawEntityBox(...)
+}
+endBatch()
+```
+
+### Distance Culling
+
+```kotlin
+val maxDistance = 50.0
+for (entity in entities) {
+    if (player.distanceTo(entity) > maxDistance) continue
+    drawEntityBox(...)
+}
+```
+
+### Frustum Culling
+
+```kotlin
+if (!camera.isInFrustum(entity.boundingBox)) continue
+drawEntityBox(...)
+```
+
+## Best Practices
+
+1. **Use appropriate events** - WorldRenderEvent for 3D, OverlayRenderEvent for 2D
+2. **Batch similar renders** - More efficient than individual draws
+3. **Use distance culling** - Don't render far entities
+4. **Cache calculations** - Compute once per frame, not per entity
+5. **Use alpha for transparency** - Looks better and performs well
+6. **Consider color blindness** - Use distinguishable colors
+7. **Add toggles** - Let users customize rendering
+
+## See Also
+
+- [EventListener](/api/event-listener) - Event handling
+- [ClientModule](/api/client-module) - Module implementation
+- [Value Types](/api/value-types) - Color configuration

@@ -1,80 +1,453 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick Start"
+description: "Learn the basics of LiquidBounce and start using modules, keybinds, and commands"
 ---
 
-## Get started in three steps
+## Getting Started
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through the essential features of LiquidBounce. By the end, you'll know how to enable modules, set keybinds, use the ClickGUI, and execute commands.
 
-### Step 1: Set up your local environment
+<Note>
+  Make sure you've completed the [installation](/installation) before starting this guide.
+</Note>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+## Opening the ClickGUI
+
+The ClickGUI is your primary interface for managing modules and settings.
+
+<Steps>
+  <Step title="Press the ClickGUI Keybind">
+    The default keybind is **Right Shift**. Press it to open the ClickGUI.
+
+    <Note>
+      The ClickGUI module is located in the **Render** category and is always running. It cannot be disabled, but you can change its keybind.
+    </Note>
+  </Step>
+
+  <Step title="Navigate the Interface">
+    The ClickGUI displays all modules organized by category:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    - **Combat**: PvP and combat-related modules
+    - **Movement**: Speed, flight, and movement enhancements
+    - **Player**: Inventory management and player utilities
+    - **World**: Block interaction and world manipulation
+    - **Render**: Visual enhancements and ESP
+    - **Misc**: Miscellaneous utilities
+    - **Exploit**: Server exploits and special features
+    - **Fun**: Cosmetic and entertainment features
+  </Step>
 
-### Step 2: Deploy your changes
+  <Step title="Search for Modules">
+    Use the search bar to quickly find modules by name. The search supports auto-focus for faster access.
+  </Step>
+</Steps>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Enabling Your First Module
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+Let's enable a simple module to get familiar with the interface.
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Open the ClickGUI">
+    Press **Right Shift** to open the ClickGUI.
+  </Step>
 
-### Step 3: Go live
+  <Step title="Select a Category">
+    Click on the **Render** category to see visual enhancement modules.
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Enable FullBright">
+    Find and click on **FullBright** to enable it. This module increases brightness so you can see in dark areas.
 
-## Next steps
+    <Note>
+      When a module is enabled, you'll see a notification in the top-right corner confirming the activation.
+    </Note>
+  </Step>
 
-Now that you have your docs running, explore these key features:
+  <Step title="Verify It's Working">
+    Enter a dark cave or turn off all lights. You should now see clearly without torches!
+  </Step>
+</Steps>
+
+## Using Commands
+
+LiquidBounce features a powerful command system accessible via the in-game chat.
+
+### Command Prefix
+
+By default, all LiquidBounce commands start with a dot (`.`). You can change this prefix using the client settings.
+
+### Basic Commands
+
+<CodeGroup>
+```bash Toggle Module
+.toggle <module>
+.t <module>
+```
+
+```bash Bind Key
+.bind <module> <key>
+```
+
+```bash Hide Module
+.hide <module>
+```
+
+```bash Help
+.help
+.help <command>
+```
+</CodeGroup>
+
+### Example: Toggle a Module
+
+<Steps>
+  <Step title="Open Chat">
+    Press **T** to open the chat.
+  </Step>
+
+  <Step title="Type the Command">
+    Type `.toggle FullBright` or `.t FullBright`
+
+    <Note>
+      Commands are **case-insensitive** and support auto-completion. Press **Tab** to cycle through suggestions.
+    </Note>
+  </Step>
+
+  <Step title="Press Enter">
+    The module will toggle on or off, and you'll see a confirmation message.
+  </Step>
+</Steps>
+
+## Setting Keybinds
+
+Keybinds allow you to quickly toggle modules without opening the ClickGUI.
+
+### Method 1: Using the ClickGUI
+
+<Steps>
+  <Step title="Open ClickGUI">
+    Press **Right Shift**.
+  </Step>
+
+  <Step title="Select a Module">
+    Click on any module to view its settings.
+  </Step>
+
+  <Step title="Find the Bind Setting">
+    Look for the **Bind** option in the module settings.
+  </Step>
+
+  <Step title="Click and Press Key">
+    Click on the bind field and press the key you want to assign.
+  </Step>
+
+  <Step title="Save">
+    The keybind is automatically saved. You can now toggle the module with your chosen key.
+  </Step>
+</Steps>
+
+### Method 2: Using Commands
+
+You can also set keybinds via commands:
+
+```bash
+.bind <module> <key>
+```
+
+**Examples:**
+```bash
+.bind KillAura R
+.bind Fly G
+.bind Sprint LCONTROL
+```
+
+<Note>
+  Use key names like `R`, `G`, `LSHIFT`, `LCONTROL`, etc. Press **Tab** after typing the module name for key suggestions.
+</Note>
+
+### Bind Actions
+
+Modules support different bind actions:
+
+- **TOGGLE**: Switches the module on/off (default)
+- **HOLD**: Module is active only while the key is held
+
+You can configure the bind action in the module's settings.
+
+## Exploring Module Settings
+
+Most modules have configurable settings to customize their behavior.
+
+<Steps>
+  <Step title="Open a Module">
+    In the ClickGUI, click on any module to open its settings panel.
+  </Step>
+
+  <Step title="Adjust Settings">
+    You'll see various configuration options:
+    - **Sliders**: Adjust numerical values (range, speed, etc.)
+    - **Toggles**: Enable/disable sub-features
+    - **Dropdowns**: Select from predefined options
+    - **Text Fields**: Enter custom text or values
+  </Step>
+
+  <Step title="Use Value Groups">
+    Some modules have nested settings called "Value Groups" that organize related options.
+  </Step>
+
+  <Step title="Save Changes">
+    All changes are automatically saved to your configuration.
+  </Step>
+</Steps>
+
+## Module Categories Explained
+
+### Combat Modules
+
+Modules focused on PvP and combat:
+
+- **KillAura**: Automatically attacks nearby entities
+- **Velocity**: Reduces or removes knockback
+- **AutoArmor**: Automatically equips the best armor
+- **Criticals**: Forces critical hits
+
+### Movement Modules
+
+Enhance your movement capabilities:
+
+- **Fly**: Allows you to fly in survival mode
+- **Speed**: Increases movement speed
+- **Sprint**: Automatically sprints
+- **Step**: Step up multiple blocks at once
+
+### Render Modules
+
+Visual enhancements and information:
+
+- **ESP**: Highlights entities through walls
+- **Tracers**: Draws lines to entities
+- **Nametags**: Customizes name displays
+- **HUD**: Heads-up display with module list
+
+### Player Modules
+
+Utilities for the player:
+
+- **ChestStealer**: Automatically steals from chests
+- **InventoryCleaner**: Organizes your inventory
+- **NoFall**: Prevents fall damage
+- **AutoTool**: Selects the best tool automatically
+
+### World Modules
+
+Interact with the world:
+
+- **Scaffold**: Automatically places blocks beneath you
+- **FastBreak**: Breaks blocks faster
+- **FastPlace**: Places blocks faster
+- **AutoMine**: Automatically mines blocks
+
+## Configuration Management
+
+LiquidBounce supports multiple configurations for different scenarios.
+
+### Save Current Config
+
+```bash
+.config save <name>
+```
+
+### Load a Config
+
+```bash
+.config load <name>
+```
+
+### List Configs
+
+```bash
+.config list
+```
+
+### Local Configs
+
+Local configs are server-specific configurations that load automatically:
+
+```bash
+.localconfig create <name>
+.localconfig load <name>
+```
+
+<Tip>
+  Create different configs for different servers or game modes (e.g., "hypixel", "pvp", "minigames").
+</Tip>
+
+## Managing the HUD
+
+The HUD (Heads-Up Display) shows active modules and information.
+
+<Steps>
+  <Step title="Enable HUD Module">
+    The **HUD** module in the Render category controls the on-screen display.
+
+    ```bash
+    .toggle HUD
+    ```
+  </Step>
+
+  <Step title="Customize HUD">
+    Open the HUD module settings in ClickGUI to:
+    - Change colors and themes
+    - Enable/disable specific elements
+    - Adjust positioning and size
+    - Configure the module list (ArrayList)
+  </Step>
+</Steps>
+
+## Hiding Modules
+
+You can hide modules from the HUD's module list:
+
+```bash
+.hide <module>
+```
+
+To unhide:
+```bash
+.hide <module>
+```
+
+You can also set the **Hidden** option to `true` in the module's settings.
+
+## Panic Mode
+
+Quickly disable all modules at once:
+
+```bash
+.panic
+```
+
+<Warning>
+  Panic mode will disable **all active modules** instantly. Use this if you need to quickly appear legitimate.
+</Warning>
+
+## Script Support
+
+LiquidBounce supports custom scripts for advanced users.
+
+### Load a Script
+
+```bash
+.script load <file>
+```
+
+### List Scripts
+
+```bash
+.script list
+```
+
+### Reload Scripts
+
+```bash
+.script reload
+```
+
+<Note>
+  Scripts are loaded from the `LiquidBounce/scripts` folder in your Minecraft directory. Learn more about scripting in the [Script API documentation](#).
+</Note>
+
+## Tips and Best Practices
 
 <CardGroup cols={2}>
+  <Card title="Start Simple" icon="seedling">
+    Begin with simple modules like FullBright and Sprint before trying complex combat modules.
+  </Card>
+  
+  <Card title="Test in Singleplayer" icon="person">
+    Always test new modules in singleplayer before using them on servers.
+  </Card>
+  
+  <Card title="Read Module Descriptions" icon="book">
+    Hover over modules in the ClickGUI to see descriptions and learn what they do.
+  </Card>
+  
+  <Card title="Use Tab Completion" icon="keyboard">
+    Press Tab while typing commands to see available options and auto-complete.
+  </Card>
+  
+  <Card title="Backup Configs" icon="floppy-disk">
+    Regularly save your configurations so you don't lose your settings.
+  </Card>
+  
+  <Card title="Join the Community" icon="users">
+    Join the Discord or forums to get help, share configs, and learn from others.
+  </Card>
+</CardGroup>
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+## Common Issues
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+<AccordionGroup>
+  <Accordion title="Module doesn't work on a server">
+    Some servers have anti-cheat systems that may block or detect certain modules. Always check server rules before using LiquidBounce.
+  </Accordion>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+  <Accordion title="Keybind not working">
+    - Check if another module is using the same keybind
+    - Ensure you're not in a GUI or typing in chat
+    - Try rebinding to a different key
+  </Accordion>
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+  <Accordion title="ClickGUI won't open">
+    The ClickGUI module might have a different keybind. Check the module settings or use:
+    ```bash
+    .toggle ClickGUI
+    ```
+  </Accordion>
 
+  <Accordion title="Modules reset after restart">
+    Your config might not be saving. Check file permissions in the `LiquidBounce` folder and ensure the client has write access.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that you know the basics, explore more advanced features:
+
+<CardGroup cols={2}>
+  <Card
+    title="Module Reference"
+    icon="book"
+    href="#"
+  >
+    Detailed documentation for every module
+  </Card>
+  
+  <Card
+    title="Command Reference"
+    icon="terminal"
+    href="#"
+  >
+    Complete list of all available commands
+  </Card>
+  
+  <Card
+    title="Script API"
+    icon="code"
+    href="#"
+  >
+    Learn to create custom modules with JavaScript
+  </Card>
+  
+  <Card
+    title="Contributing"
+    icon="code-pull-request"
+    href="https://github.com/CCBlueX/LiquidBounce"
+  >
+    Contribute to LiquidBounce development
+  </Card>
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Have questions? Join our [Discord](https://liquidbounce.net/discord) or visit the [forums](https://forums.ccbluex.net) for help!
 </Note>

@@ -1,0 +1,502 @@
+---
+title: Working with Events
+description: Handle game and client events in LiquidBounce scripts
+icon: bolt
+---
+
+## Overview
+
+Events are the primary way to react to game actions and client state changes in LiquidBounce. Scripts can listen to events to implement custom behavior.
+
+## Event Handlers
+
+Register event handlers using `module.on()` within a module:
+
+```javascript
+script.registerModule({
+    name: "EventExample",
+    category: "Misc"
+}, function(module) {
+    
+    module.on("playerTick", function(event) {
+        // Called every player tick
+    });
+    
+});
+```
+
+## Cancellable Events
+
+Some events can be cancelled to prevent default behavior:
+
+```javascript
+module.on("packet", function(event) {
+    // Cancel a specific packet
+    if (event.packet instanceof SomePacketClass) {
+        event.cancelEvent();
+    }
+});
+```
+
+<Warning>
+Cancelling critical events may cause game instability. Only cancel events when you understand the consequences.
+</Warning>
+
+## Available Events
+
+Here's a comprehensive list of events you can listen to:
+
+### Player Events
+
+<AccordionGroup>
+  <Accordion title="playerTick">
+    Called every tick for the local player. Cancellable.
+    
+    ```javascript
+    module.on("playerTick", function(event) {
+        var player = mc.player;
+        // Custom player logic
+    });
+    ```
+    
+    **Source:** `PlayerTickEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/PlayerEvents.kt:43)
+  </Accordion>
+
+  <Accordion title="playerPostTick">
+    Called after player tick processing.
+    
+    ```javascript
+    module.on("playerPostTick", function(event) {
+        // Post-tick logic
+    });
+    ```
+    
+    **Source:** `PlayerPostTickEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/PlayerEvents.kt:46)
+  </Accordion>
+
+  <Accordion title="playerMove">
+    Called when the player moves.
+    
+    ```javascript
+    module.on("playerMove", function(event) {
+        var movement = event.movement;
+        // Access: movement.x, movement.y, movement.z
+        // Modify movement vector
+        event.movement = new Vec3d(newX, newY, newZ);
+    });
+    ```
+    
+    **Source:** `PlayerMoveEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/PlayerEvents.kt:64)
+  </Accordion>
+
+  <Accordion title="playerJump">
+    Called when the player jumps. Cancellable.
+    
+    ```javascript
+    module.on("playerJump", function(event) {
+        // Modify jump motion
+        event.motion *= 1.5; // Higher jump
+        
+        // Or cancel the jump
+        event.cancelEvent();
+    });
+    ```
+    
+    **Source:** `PlayerJumpEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/PlayerEvents.kt:67)
+  </Accordion>
+
+  <Accordion title="playerAfterJump">
+    Called immediately after a jump is executed.
+    
+    ```javascript
+    module.on("playerAfterJump", function(event) {
+        Client.displayChatMessage("Jumped!");
+    });
+    ```
+    
+    **Source:** `PlayerAfterJumpEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/PlayerEvents.kt:70)
+  </Accordion>
+
+  <Accordion title="playerSafeWalk">
+    Control whether the player should avoid falling off edges.
+    
+    ```javascript
+    module.on("playerSafeWalk", function(event) {
+        event.isSafeWalk = true; // Enable safewalk
+    });
+    ```
+    
+    **Source:** `PlayerSafeWalkEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/PlayerEvents.kt:98)
+  </Accordion>
+
+  <Accordion title="playerStep">
+    Modify step height for climbing blocks.
+    
+    ```javascript
+    module.on("playerStep", function(event) {
+        event.height = 1.0; // Allow stepping up full blocks
+    });
+    ```
+    
+    **Source:** `PlayerStepEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/PlayerEvents.kt:101)
+  </Accordion>
+
+  <Accordion title="healthUpdate">
+    Called when player health, food, or saturation changes.
+    
+    ```javascript
+    module.on("healthUpdate", function(event) {
+        var health = event.health;
+        var previousHealth = event.previousHealth;
+        var food = event.food;
+        var saturation = event.saturation;
+        
+        if (health < previousHealth) {
+            Client.displayChatMessage("§cTook damage!");
+        }
+    });
+    ```
+    
+    **Source:** `HealthUpdateEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/PlayerEvents.kt:37)
+  </Accordion>
+
+  <Accordion title="death">
+    Called when the player dies.
+    
+    ```javascript
+    module.on("death", function(event) {
+        Client.displayChatMessage("§cYou died!");
+    });
+    ```
+    
+    **Source:** `DeathEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/PlayerEvents.kt:40)
+  </Accordion>
+</AccordionGroup>
+
+### Game Events
+
+<AccordionGroup>
+  <Accordion title="gameTick">
+    Called every game tick (20 times per second).
+    
+    ```javascript
+    module.on("gameTick", function(event) {
+        // Game tick logic
+    });
+    ```
+    
+    **Source:** `GameTickEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:41)
+  </Accordion>
+
+  <Accordion title="key">
+    Called when a key is pressed.
+    
+    ```javascript
+    module.on("key", function(event) {
+        var key = event.key;
+        var action = event.action; // 0 = release, 1 = press, 2 = repeat
+        
+        Client.displayChatMessage("Key pressed: " + key.getName());
+    });
+    ```
+    
+    **Source:** `KeyEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:55)
+  </Accordion>
+
+  <Accordion title="movementInput">
+    Modify player movement input.
+    
+    ```javascript
+    module.on("movementInput", function(event) {
+        var input = event.directionalInput;
+        event.jump = true; // Force jump
+        event.sneak = false; // Disable sneak
+    });
+    ```
+    
+    **Source:** `MovementInputEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:65)
+  </Accordion>
+
+  <Accordion title="sprint">
+    Control sprint state.
+    
+    ```javascript
+    module.on("sprint", function(event) {
+        event.sprint = true; // Force sprinting
+    });
+    ```
+    
+    **Source:** `SprintEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:72)
+  </Accordion>
+
+  <Accordion title="mouseRotation">
+    Modify mouse rotation. Cancellable.
+    
+    ```javascript
+    module.on("mouseRotation", function(event) {
+        event.cursorDeltaX *= 0.5; // Reduce sensitivity
+        event.cursorDeltaY *= 0.5;
+    });
+    ```
+    
+    **Source:** `MouseRotationEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:85)
+  </Accordion>
+</AccordionGroup>
+
+### Network Events
+
+<AccordionGroup>
+  <Accordion title="packet">
+    Called for incoming and outgoing packets. Cancellable.
+    
+    ```javascript
+    module.on("packet", function(event) {
+        var packet = event.packet;
+        var origin = event.origin; // "INCOMING" or "OUTGOING"
+        
+        // Check packet type
+        if (packet.getClass().getSimpleName() === "ServerboundChatPacket") {
+            Client.displayChatMessage("Sending chat packet");
+        }
+        
+        // Cancel packet
+        // event.cancelEvent();
+    });
+    ```
+    
+    **Source:** `PacketEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/NetworkEvents.kt:34)
+  </Accordion>
+</AccordionGroup>
+
+### Chat Events
+
+<AccordionGroup>
+  <Accordion title="chatReceive">
+    Called when receiving a chat message. Cancellable.
+    
+    ```javascript
+    module.on("chatReceive", function(event) {
+        var message = event.message;
+        var textData = event.textData;
+        var type = event.type; // CHAT_MESSAGE, GAME_MESSAGE, etc.
+        
+        if (message.contains("secret")) {
+            event.cancelEvent(); // Hide message
+        }
+    });
+    ```
+    
+    **Source:** `ChatReceiveEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:132)
+  </Accordion>
+
+  <Accordion title="chatSend">
+    Called when sending a chat message. Cancellable.
+    
+    ```javascript
+    module.on("chatSend", function(event) {
+        var message = event.message;
+        
+        // Prevent sending certain messages
+        if (message.startsWith("!")) {
+            event.cancelEvent();
+            Client.displayChatMessage("§cCommand blocked!");
+        }
+    });
+    ```
+    
+    **Source:** `ChatSendEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:127)
+  </Accordion>
+</AccordionGroup>
+
+### Connection Events
+
+<AccordionGroup>
+  <Accordion title="serverConnect">
+    Called when connecting to a server. Cancellable.
+    
+    ```javascript
+    module.on("serverConnect", function(event) {
+        var address = event.address.getHost();
+        Client.displayChatMessage("§aConnecting to: " + address);
+    });
+    ```
+    
+    **Source:** `ServerConnectEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:146)
+  </Accordion>
+
+  <Accordion title="disconnect">
+    Called when disconnecting from a server.
+    
+    ```javascript
+    module.on("disconnect", function(event) {
+        Client.displayChatMessage("§cDisconnected from server");
+    });
+    ```
+    
+    **Source:** `DisconnectEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:154)
+  </Accordion>
+
+  <Accordion title="session">
+    Called when session changes (login).
+    
+    ```javascript
+    module.on("session", function(event) {
+        var session = event.session;
+        var username = session.getName();
+        Client.displayChatMessage("§aLogged in as: " + username);
+    });
+    ```
+    
+    **Source:** `SessionEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:117)
+  </Accordion>
+</AccordionGroup>
+
+### Screen Events
+
+<AccordionGroup>
+  <Accordion title="screen">
+    Called when screen/GUI changes. Cancellable.
+    
+    ```javascript
+    module.on("screen", function(event) {
+        var screen = event.screen;
+        
+        if (screen !== null) {
+            var screenName = screen.getClass().getSimpleName();
+            Client.displayChatMessage("§7Opened: " + screenName);
+        }
+    });
+    ```
+    
+    **Source:** `ScreenEvent` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/event/events/GameEvents.kt:122)
+  </Accordion>
+</AccordionGroup>
+
+## Event Properties
+
+Each event object contains specific properties. Access them via the event parameter:
+
+```javascript
+module.on("playerMove", function(event) {
+    // Access event properties
+    var type = event.type;
+    var movement = event.movement;
+    
+    // Modify mutable properties
+    event.movement = newMovement;
+});
+```
+
+## Cancelling Events
+
+For cancellable events, use `event.cancelEvent()`:
+
+```javascript
+module.on("playerJump", function(event) {
+    if (shouldPreventJump) {
+        event.cancelEvent();
+    }
+});
+```
+
+Check if an event is cancelled:
+
+```javascript
+if (event.isCancelled) {
+    // Event was cancelled
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Check for null">
+    Always verify that game objects exist:
+    ```javascript
+    module.on("playerTick", function(event) {
+        var player = mc.player;
+        if (!player) return;
+        
+        var world = mc.level;
+        if (!world) return;
+        
+        // Safe to use player and world
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Use specific events">
+    Choose the most specific event for your needs:
+    - Use `playerTick` for frequent player updates
+    - Use `gameTick` for less frequent game logic
+    - Use specific events like `playerJump` instead of checking in `playerTick`
+  </Accordion>
+
+  <Accordion title="Performance considerations">
+    Avoid heavy operations in frequently-called events:
+    ```javascript
+    var tickCount = 0;
+    module.on("playerTick", function() {
+        tickCount++;
+        
+        // Only run every 20 ticks (1 second)
+        if (tickCount % 20 === 0) {
+            // Heavy operation here
+        }
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Handle errors gracefully">
+    Wrap potentially failing code in try-catch:
+    ```javascript
+    module.on("packet", function(event) {
+        try {
+            // Risky packet handling
+        } catch (e) {
+            Client.displayChatMessage("§cError: " + e.message);
+        }
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Event Categories Summary
+
+<CardGroup cols={2}>
+  <Card title="Player Events" icon="user">
+    - playerTick, playerPostTick
+    - playerMove, playerJump
+    - playerSafeWalk, playerStep
+    - healthUpdate, death
+  </Card>
+  
+  <Card title="Game Events" icon="gamepad">
+    - gameTick, key
+    - movementInput, sprint
+    - mouseRotation
+  </Card>
+  
+  <Card title="Network Events" icon="wifi">
+    - packet
+    - serverConnect, disconnect
+    - session
+  </Card>
+  
+  <Card title="Chat & UI Events" icon="message">
+    - chatReceive, chatSend
+    - screen
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/scripting/api-reference">
+    Explore available utilities and functions
+  </Card>
+  
+  <Card title="Creating Modules" icon="cube" href="/scripting/creating-modules">
+    Build modules that use events
+  </Card>
+</CardGroup>

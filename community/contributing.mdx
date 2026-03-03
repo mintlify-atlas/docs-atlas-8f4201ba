@@ -1,0 +1,220 @@
+---
+title: Contributing
+description: Learn how to contribute to LiquidBounce development
+icon: code-pull-request
+---
+
+## Welcome Contributors
+
+We appreciate contributions to LiquidBounce! If you want to support us, feel free to make changes to LiquidBounce's source code and submit a pull request. This guide will help you get started.
+
+<Note>
+  LiquidBounce is licensed under GPL-3.0. Make sure you understand the license requirements before contributing.
+</Note>
+
+## Setting Up Your Development Environment
+
+LiquidBounce uses Gradle and requires Node.js for the theme development.
+
+### Prerequisites
+
+- [Gradle](https://gradle.org/install/) - Build automation tool
+- [Node.js](https://nodejs.org) - Required for the [theme](https://github.com/CCBlueX/LiquidBounce/tree/nextgen/src-theme)
+- Git - Version control
+
+### Clone and Setup
+
+1. Clone the repository with submodules:
+   ```bash
+   git clone --recurse-submodules https://github.com/CCBlueX/LiquidBounce
+   ```
+
+2. Navigate to the directory:
+   ```bash
+   cd LiquidBounce
+   ```
+
+3. Generate sources (optional but recommended):
+   ```bash
+   ./gradlew genSources
+   ```
+
+4. Open the folder as a Gradle project in your preferred IDE (IntelliJ IDEA recommended)
+
+5. Run the client to verify your setup:
+   ```bash
+   ./gradlew runClient
+   ```
+
+## Code Style Guidelines
+
+LiquidBounce uses **detekt** for static code analysis to maintain code quality and consistency.
+
+### Code Standards
+
+<CardGroup cols={2}>
+  <Card title="Indentation" icon="indent">
+    - Use **4 spaces** for Kotlin and Java files
+    - No tabs allowed
+  </Card>
+  
+  <Card title="Line Endings" icon="file-lines">
+    - Use **LF** (Unix-style) line endings
+    - UTF-8 character encoding
+  </Card>
+  
+  <Card title="Imports" icon="file-import">
+    - No wildcard imports
+    - Star imports threshold: 9999 (effectively disabled)
+  </Card>
+  
+  <Card title="Braces" icon="brackets-curly">
+    - Single line: never use braces
+    - Multi-line: always use braces
+  </Card>
+</CardGroup>
+
+### Detekt Configuration
+
+The project includes a detekt configuration at `config/detekt/detekt.yml` with the following key rules:
+
+- **Complexity limits**: Maximum 16 cognitive complexity, 4 return statements
+- **Parameter limits**: Maximum 7 function/constructor parameters
+- **Forbidden methods**: No direct `println()`, use proper logging instead
+- **Performance checks**: Array primitive usage, unnecessary instantiation
+
+### EditorConfig
+
+The `.editorconfig` file ensures consistent formatting across different editors:
+
+```ini
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+ij_kotlin_name_count_to_use_star_import = 9999
+```
+
+## Understanding Mixins
+
+LiquidBounce uses **Mixins** to modify Minecraft classes at runtime before they are loaded. This allows us to inject code into the Minecraft client without shipping Mojang's copyrighted code.
+
+<Note>
+  Learn more about Mixins in the [Sponge Documentation](https://docs.spongepowered.org/5.1.0/en/plugin/internals/mixins.html)
+</Note>
+
+## Pull Request Process
+
+### Before Submitting
+
+1. **Test your changes** thoroughly
+2. **Run detekt** to ensure code quality:
+   ```bash
+   ./gradlew detekt
+   ```
+3. **Follow the code style** guidelines above
+4. **Write clear commit messages** describing what and why
+
+### Submitting a Pull Request
+
+1. Fork the repository
+2. Create a feature branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. Make your changes and commit them
+4. Push to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+5. Open a pull request on GitHub
+6. Describe your changes clearly in the PR description
+
+### What Makes a Good PR?
+
+<CardGroup cols={2}>
+  <Card title="Clear Purpose" icon="bullseye">
+    Explain what problem you're solving or what feature you're adding
+  </Card>
+  
+  <Card title="Small & Focused" icon="compress">
+    Keep changes focused on a single feature or fix
+  </Card>
+  
+  <Card title="Well Tested" icon="vial">
+    Test your changes in different scenarios
+  </Card>
+  
+  <Card title="Documented" icon="book">
+    Update documentation if you're adding new features
+  </Card>
+</CardGroup>
+
+## License Requirements (GPL-3.0)
+
+<Warning>
+  This project is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). Understanding the license is crucial.
+</Warning>
+
+### What You Can Do
+
+- **Use** the code freely
+- **Share** the code with others
+- **Modify** the code for your needs
+
+### What You Must Do
+
+If you use ANY code from LiquidBounce:
+
+<Steps>
+  <Step title="Disclose Source Code">
+    You must disclose the source code of your modified work and the source code you took from this project.
+  </Step>
+  
+  <Step title="No Closed Source">
+    You are **not allowed** to use code from this project (even partially) in a closed-source or obfuscated application.
+  </Step>
+  
+  <Step title="GPL License">
+    Your modified application must also be licensed under the GPL.
+  </Step>
+</Steps>
+
+<Note>
+  This applies only to source code located directly in the clean repository. Additional dependencies may have different licenses.
+</Note>
+
+## Reporting Issues
+
+Found a bug or have a feature request?
+
+1. Check if the issue already exists on [GitHub Issues](https://github.com/CCBlueX/LiquidBounce/issues)
+2. If not, create a new issue with:
+   - Clear title and description
+   - Steps to reproduce (for bugs)
+   - Expected vs actual behavior
+   - Your environment (Minecraft version, OS, etc.)
+
+## Additional Resources
+
+<CardGroup cols={2}>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/CCBlueX/LiquidBounce">
+    View the source code and contribute
+  </Card>
+  
+  <Card title="Discord Community" icon="discord" href="https://liquidbounce.net/discord">
+    Get help from the community
+  </Card>
+  
+  <Card title="Forum" icon="comments" href="https://forums.ccbluex.net">
+    Discuss features and get support
+  </Card>
+  
+  <Card title="Stats" icon="chart-line" href="https://repobeats.axiom.co/api/embed/ad3a9161793c4dfe50934cd4442d25dc3ca93128.svg">
+    View project analytics
+  </Card>
+</CardGroup>
+
+## Questions?
+
+If you have questions about contributing, feel free to ask on our [Discord server](https://liquidbounce.net/discord) or [Forum](https://forums.ccbluex.net).

@@ -1,0 +1,501 @@
+---
+title: Troubleshooting
+description: Solutions to common LiquidBounce issues and problems
+icon: wrench
+---
+
+## Common Issues
+
+This guide covers the most common issues users encounter with LiquidBounce and how to resolve them.
+
+<Note>
+  Before troubleshooting, make sure you're using the latest version of LiquidBounce and Fabric.
+</Note>
+
+## Installation Issues
+
+### Game Won't Start
+
+<AccordionGroup>
+  <Accordion title="Minecraft crashes on startup">
+    **Symptoms**: Game crashes immediately when launching or during the loading screen.
+    
+    **Solutions**:
+    
+    1. **Verify Fabric Installation**:
+       - Ensure Fabric loader is installed for the correct Minecraft version
+       - Download from [fabricmc.net](https://fabricmc.net/use/)
+    
+    2. **Check Mod Compatibility**:
+       - Remove all mods except LiquidBounce
+       - If it works, add mods back one by one to find the conflict
+    
+    3. **Review Crash Logs**:
+       - Check `.minecraft/crash-reports/` for crash reports
+       - Look for error messages mentioning specific mods or missing dependencies
+    
+    4. **Verify Java Version**:
+       - Minecraft 1.17+ requires Java 17 or higher
+       - Check your Java version in the launcher settings
+    
+    <Tip>
+      Share crash logs on Discord or the forum for community help.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="LiquidBounce not appearing in mods list">
+    **Symptoms**: Mod list doesn't show LiquidBounce after installation.
+    
+    **Solutions**:
+    
+    1. **Verify Installation**:
+       - Confirm the `.jar` file is in `.minecraft/mods/`
+       - Check you're launching with the **Fabric** profile, not Vanilla or Forge
+    
+    2. **Check File Integrity**:
+       - Re-download LiquidBounce from [liquidbounce.net](https://liquidbounce.net)
+       - Ensure the download completed successfully
+    
+    3. **Version Mismatch**:
+       - Verify LiquidBounce version matches your Minecraft version
+       - Check the file name for version information
+    
+    4. **Fabric API Missing**:
+       - Some features require [Fabric API](https://modrinth.com/mod/fabric-api)
+       - Install Fabric API in your mods folder
+  </Accordion>
+
+  <Accordion title="'Incompatible mod set' error">
+    **Symptoms**: Error message about incompatible mods or missing dependencies.
+    
+    **Solutions**:
+    
+    1. **Install Fabric API**:
+       ```
+       Download from: https://modrinth.com/mod/fabric-api
+       Place in: .minecraft/mods/
+       ```
+    
+    2. **Check Minecraft Version**:
+       - Ensure all mods are for the same Minecraft version
+       - Remove mods for different versions
+    
+    3. **Update Dependencies**:
+       - Update Fabric loader to the latest version
+       - Update other required mods
+  </Accordion>
+</AccordionGroup>
+
+### Installation Steps Not Working
+
+<Steps>
+  <Step title="Clean Installation">
+    1. Remove LiquidBounce from `.minecraft/mods/`
+    2. Delete the `LiquidBounce` folder from `.minecraft/`
+    3. Reinstall Fabric loader
+    4. Download fresh LiquidBounce build
+    5. Place in mods folder and launch
+  </Step>
+  
+  <Step title="Verify Prerequisites">
+    - Java 17+ installed
+    - Fabric loader installed
+    - Correct Minecraft version
+    - No conflicting mods
+  </Step>
+  
+  <Step title="Check Logs">
+    Review `.minecraft/logs/latest.log` for error messages during startup
+  </Step>
+</Steps>
+
+## Performance Issues
+
+### Low FPS / Lag
+
+<CardGroup cols={2}>
+  <Card title="Disable Visual Modules" icon="eye-slash">
+    Visual modules like ESP, Tracers, and Trails can impact FPS. Disable modules you don't actively use.
+  </Card>
+  
+  <Card title="Optimize Settings" icon="sliders">
+    Lower Minecraft graphics settings, reduce render distance, and disable fancy graphics.
+  </Card>
+  
+  <Card title="Install Performance Mods" icon="gauge-high">
+    Add [Sodium](https://modrinth.com/mod/sodium) and [Lithium](https://modrinth.com/mod/lithium) for better performance.
+  </Card>
+  
+  <Card title="Allocate More RAM" icon="memory">
+    Give Minecraft 2-4GB of RAM through launcher settings (don't exceed 50% of total RAM).
+  </Card>
+</CardGroup>
+
+### Detailed Performance Solutions
+
+<Accordion title="Step-by-step FPS optimization">
+  1. **Check Resource Usage**:
+     - Open Task Manager (Windows) or Activity Monitor (Mac)
+     - Monitor CPU and RAM usage while playing
+  
+  2. **Optimize Java Arguments**:
+     Add these JVM arguments in launcher settings:
+     ```
+     -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200
+     -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC
+     -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40
+     -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20
+     -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4
+     ```
+  
+  3. **Disable Heavy Modules**:
+     - ESP modules (especially with many entities)
+     - Tracers with long lines
+     - Particle effects
+     - Animations
+  
+  4. **Compatible Performance Mods**:
+     - [Sodium](https://modrinth.com/mod/sodium) - Rendering engine
+     - [Lithium](https://modrinth.com/mod/lithium) - Server/game optimization
+     - [Starlight](https://modrinth.com/mod/starlight) - Lighting engine
+     - [FerriteCore](https://modrinth.com/mod/ferrite-core) - Memory optimization
+</Accordion>
+
+### Memory Issues
+
+<Warning>
+  Don't allocate more than 4-6GB of RAM unless you have 16GB+ total system memory.
+</Warning>
+
+**Out of Memory Errors**:
+
+1. Increase allocated RAM in launcher:
+   - Open launcher settings
+   - Find JVM Arguments
+   - Change `-Xmx2G` to `-Xmx4G` (or higher)
+
+2. Close other applications while playing
+
+3. Check for memory leaks:
+   - Monitor RAM usage over time
+   - Restart game periodically
+
+## Module Issues
+
+### Modules Not Working
+
+<AccordionGroup>
+  <Accordion title="Module enabled but not functioning">
+    **Common Causes**:
+    
+    1. **Server-Side Detection**:
+       - Many servers detect and block client modifications
+       - Module may be disabled server-side
+    
+    2. **Incorrect Settings**:
+       - Review module configuration
+       - Some modules require specific settings to work
+       - Reset module to default settings
+    
+    3. **Conflicting Modules**:
+       - Disable other modules that might conflict
+       - Test the module in isolation
+    
+    4. **Version Incompatibility**:
+       - Module may not work on certain Minecraft versions
+       - Check GitHub issues for known problems
+  </Accordion>
+
+  <Accordion title="Module keybinds not responding">
+    **Solutions**:
+    
+    1. Check for key conflicts with Minecraft or other mods
+    2. Rebind the module to a different key
+    3. Use the command instead: `.toggle <module>`
+    4. Verify keybinds are saved in `LiquidBounce/binds.json`
+  </Accordion>
+
+  <Accordion title="Module settings reset on restart">
+    **Causes & Fixes**:
+    
+    1. **Permissions Issue**:
+       - Check file permissions for `LiquidBounce/` folder
+       - Ensure Minecraft can write to the directory
+    
+    2. **Corrupted Config**:
+       - Delete `settings.json` to reset
+       - Reconfigure modules
+    
+    3. **Multiple Instances**:
+       - Close all Minecraft instances
+       - Launch only one instance
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Problems
+
+### Settings Not Saving
+
+<Steps>
+  <Step title="Check File Permissions">
+    Ensure `.minecraft/LiquidBounce/` folder is writable:
+    - **Windows**: Right-click folder → Properties → Uncheck "Read-only"
+    - **Linux/Mac**: `chmod -R 755 ~/.minecraft/LiquidBounce/`
+  </Step>
+  
+  <Step title="Verify Config Files">
+    Check if these files exist and are not corrupted:
+    - `settings.json`
+    - `binds.json`
+    - `accounts.json`
+  </Step>
+  
+  <Step title="Reset Configuration">
+    If files are corrupted, delete and let LiquidBounce recreate them:
+    ```bash
+    # Backup first!
+    cd .minecraft/LiquidBounce/
+    mkdir backup
+    cp *.json backup/
+    rm *.json
+    ```
+  </Step>
+</Steps>
+
+### Config Import/Export Issues
+
+<Accordion title="Imported config not working">
+  1. Verify JSON syntax is valid
+  2. Check version compatibility
+  3. Ensure all required files are imported
+  4. Try importing individual files instead of folder
+</Accordion>
+
+## Mod Conflicts
+
+### Identifying Conflicts
+
+<CardGroup cols={2}>
+  <Card title="Binary Search Method" icon="magnifying-glass">
+    1. Remove half of your mods
+    2. Test if issue persists
+    3. Repeat with the problematic half
+    4. Continue until you find the conflicting mod
+  </Card>
+  
+  <Card title="Common Conflicts" icon="triangle-exclamation">
+    - Other client mods
+    - Mods modifying rendering
+    - Mods changing keybinds
+    - Performance mods (sometimes)
+  </Card>
+</CardGroup>
+
+### Known Incompatibilities
+
+<Warning>
+  These mods may conflict with LiquidBounce:
+</Warning>
+
+- Other hacked clients (never use multiple clients together)
+- Some shaderpacks (may cause visual glitches)
+- Outdated optimization mods
+- Mods that modify Minecraft's base classes extensively
+
+## Debug Mode & Logging
+
+### Enabling Debug Output
+
+<Steps>
+  <Step title="Access Debug Settings">
+    Look for debug options in LiquidBounce's settings menu or configuration files.
+  </Step>
+  
+  <Step title="Review Logs">
+    Check detailed logs in `.minecraft/logs/latest.log` for debug information.
+  </Step>
+  
+  <Step title="Console Output">
+    Launch Minecraft from terminal/command prompt to see real-time console output:
+    
+    **Windows**:
+    ```bash
+    cd %appdata%\.minecraft
+    java -jar minecraft.jar
+    ```
+    
+    **Linux/Mac**:
+    ```bash
+    cd ~/.minecraft
+    java -jar minecraft.jar
+    ```
+  </Step>
+</Steps>
+
+### Understanding Log Files
+
+<Accordion title="Where to find logs">
+  - **Latest log**: `.minecraft/logs/latest.log`
+  - **Crash reports**: `.minecraft/crash-reports/`
+  - **Debug logs**: `.minecraft/logs/debug.log` (if enabled)
+  
+  <Tip>
+    Use [mclo.gs](https://mclo.gs) to share logs easily with the community.
+  </Tip>
+</Accordion>
+
+<Accordion title="Reading error messages">
+  Look for these key indicators in logs:
+  
+  - `[ERROR]` - Critical errors
+  - `[WARN]` - Warnings (may not be critical)
+  - `[FATAL]` - Fatal errors causing crashes
+  - `Exception` or `Error` - Stack traces showing what went wrong
+  
+  Focus on the **first error** that appears, as subsequent errors are often consequences.
+</Accordion>
+
+## Script Issues
+
+### Scripts Not Loading
+
+<AccordionGroup>
+  <Accordion title="Script file not recognized">
+    **Checklist**:
+    
+    - File extension is `.js`
+    - File is in `LiquidBounce/scripts/` folder
+    - File name doesn't contain special characters
+    - File encoding is UTF-8
+  </Accordion>
+
+  <Accordion title="Script syntax errors">
+    **Common Mistakes**:
+    
+    1. **JavaScript syntax errors**:
+       - Missing semicolons
+       - Mismatched brackets
+       - Typos in function names
+    
+    2. **API usage errors**:
+       - Incorrect API calls
+       - Missing required parameters
+       - Using deprecated functions
+    
+    **Debugging**:
+    ```javascript
+    // Add console logging
+    print("Script loaded!");
+    print("Variable value: " + myVariable);
+    ```
+  </Accordion>
+
+  <Accordion title="Script causes crashes">
+    1. Check for infinite loops
+    2. Verify all API calls are correct
+    3. Test with minimal script first
+    4. Check console/logs for error messages
+    5. Use try-catch blocks:
+    
+    ```javascript
+    try {
+        // Your code here
+    } catch (error) {
+        print("Error: " + error);
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Reloading Scripts
+
+Use the reload command to reload scripts without restarting:
+```
+.reload
+```
+
+If scripts still don't load, try:
+1. Fix any syntax errors
+2. Check file permissions
+3. Restart Minecraft
+4. Review logs for error messages
+
+## Network Issues
+
+### Connection Problems
+
+<Accordion title="Can't connect to servers with LiquidBounce">
+  1. Some servers block known client modifications
+  2. Try disabling all modules before connecting
+  3. Check if server allows client mods
+  4. Verify you're not using a VPN that's blocked
+</Accordion>
+
+<Accordion title="Getting kicked/banned from servers">
+  <Warning>
+    Many servers prohibit client modifications. Respect server rules!
+  </Warning>
+  
+  - Server has anti-cheat detecting LiquidBounce
+  - Certain modules are being detected
+  - Your actions appear suspicious
+  
+  **Solutions**:
+  - Only use on servers that allow it
+  - Disable detectable modules
+  - Use more subtle settings
+</Accordion>
+
+## Still Having Issues?
+
+### Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Discord Support" icon="discord" href="https://liquidbounce.net/discord">
+    Join our Discord for real-time troubleshooting help
+  </Card>
+  
+  <Card title="Forum" icon="comments" href="https://forums.ccbluex.net">
+    Post detailed issues on the forum
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/CCBlueX/LiquidBounce/issues">
+    Report bugs with logs and reproduction steps
+  </Card>
+  
+  <Card title="FAQ" icon="question" href="/community/faq">
+    Check the FAQ for more common questions
+  </Card>
+</CardGroup>
+
+### When Asking for Help
+
+<Note>
+  Provide this information for faster support:
+</Note>
+
+1. **Your Setup**:
+   - Minecraft version
+   - LiquidBounce version
+   - Fabric version
+   - Operating system
+   - Other mods installed
+
+2. **The Problem**:
+   - What you're trying to do
+   - What actually happens
+   - Error messages (exact text)
+   - When it started happening
+
+3. **What You've Tried**:
+   - Troubleshooting steps already attempted
+   - Any changes that might have caused it
+
+4. **Logs**:
+   - Latest log file
+   - Crash report (if applicable)
+   - Screenshots of errors
+
+<Tip>
+  Use [mclo.gs](https://mclo.gs) or [pastebin.com](https://pastebin.com) to share logs - don't paste them directly in chat!
+</Tip>

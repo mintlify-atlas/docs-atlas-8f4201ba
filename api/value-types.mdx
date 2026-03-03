@@ -1,0 +1,412 @@
+---
+title: "Value Types"
+description: "Configuration value types for creating module settings"
+---
+
+## Overview
+
+LiquidBounce provides a rich set of value types for creating module and feature settings. All values support serialization, change listeners, conditional visibility, and translation keys.
+
+**Package:** `net.ccbluex.liquidbounce.config.types`
+
+## Base Value Class
+
+```kotlin
+open class Value<T : Any>(
+    val name: String,
+    val aliases: List<String> = emptyList(),
+    private var defaultValue: T,
+    val valueType: ValueType,
+    var independentDescription: Boolean = false
+)
+```
+
+<ParamField path="name" type="String" required>
+  Value name for display and serialization
+</ParamField>
+
+<ParamField path="aliases" type="List<String>" default="emptyList()">
+  Alternative names for migration support
+</ParamField>
+
+<ParamField path="defaultValue" type="T" required>
+  Default value
+</ParamField>
+
+<ParamField path="valueType" type="ValueType" required>
+  Type information for serialization
+</ParamField>
+
+## Common Value Types
+
+### Boolean Value
+
+```kotlin
+val enabled by boolean("Enabled", true)
+```
+
+Creates a checkbox setting.
+
+**Signature:**
+```kotlin
+fun boolean(name: String, default: Boolean): BooleanValue
+```
+
+### Integer Value
+
+```kotlin
+val count by int("Count", 10, 1..100)
+```
+
+Creates an integer slider.
+
+**Signature:**
+```kotlin
+fun int(name: String, default: Int, range: IntRange): IntValue
+```
+
+### Float Value
+
+```kotlin
+val speed by float("Speed", 1.0f, 0.1f..5.0f)
+```
+
+Creates a decimal slider.
+
+**Signature:**
+```kotlin
+fun float(name: String, default: Float, range: ClosedFloatingPointRange<Float>): FloatValue
+```
+
+### Ranged Value
+
+```kotlin
+val range by floatRange("Range", 3.0f..5.0f, 0.0f..10.0f)
+```
+
+Creates a min-max range slider.
+
+**Signature:**
+```kotlin
+fun floatRange(
+    name: String,
+    default: ClosedFloatingPointRange<Float>,
+    range: ClosedFloatingPointRange<Float>
+): RangedValue<Float>
+```
+
+### Text Value
+
+```kotlin
+val message by text("Message", "Hello World")
+```
+
+Creates a text input field.
+
+**Signature:**
+```kotlin
+fun text(name: String, default: String): TextValue
+```
+
+### Choice Value
+
+```kotlin
+val mode by choices("Mode", arrayOf("Fast", "Slow", "Medium"), "Fast")
+```
+
+Creates a dropdown selection.
+
+**Signature:**
+```kotlin
+fun choices(name: String, choices: Array<String>, default: String): ChoiceValue
+```
+
+### List Value
+
+```kotlin
+val blocks by listValue("Blocks", mutableListOf<Block>())
+```
+
+Manages a list of items.
+
+**Signature:**
+```kotlin
+fun <T> listValue(name: String, default: MutableList<T>): ListValue<T>
+```
+
+### Curve Value
+
+```kotlin
+val curve by curve("Curve", arrayOf(
+    Point(0.0, 0.0),
+    Point(1.0, 1.0)
+))
+```
+
+Creates a bezier curve editor.
+
+**Signature:**
+```kotlin
+fun curve(name: String, default: Array<Point>): CurveValue
+```
+
+### Block Value
+
+```kotlin
+val targetBlock by block("Block", Blocks.STONE)
+```
+
+Block selection dropdown.
+
+**Signature:**
+```kotlin
+fun block(name: String, default: Block): BlockValue
+```
+
+### Color Value
+
+```kotlin
+val color by color("Color", Color4b(255, 0, 0, 255))
+```
+
+RGBA color picker.
+
+**Signature:**
+```kotlin
+fun color(name: String, default: Color4b): ColorValue
+```
+
+### Bind Value
+
+```kotlin
+val keybind by bind("Key", InputBind(
+    type = InputConstants.Type.KEYSYM,
+    value = GLFW.GLFW_KEY_R,
+    action = InputBind.BindAction.TOGGLE
+))
+```
+
+Keybind configuration.
+
+**Signature:**
+```kotlin
+fun bind(name: String, default: InputBind): BindValue
+```
+
+## Mode Values (Choice Groups)
+
+```kotlin
+private val modes = choices("Mode",
+    ModeA,
+    ModeB,
+    ModeC
+)
+
+object ModeA : ChoiceConfigurable(this, "ModeA") {
+    val speed by float("Speed", 1.0f, 0.1f..5.0f)
+    val ticks by int("Ticks", 20, 1..100)
+}
+
+object ModeB : ChoiceConfigurable(this, "ModeB") {
+    val power by float("Power", 2.0f, 0.1f..10.0f)
+}
+```
+
+Each mode can have its own settings that only appear when selected.
+
+**Signature:**
+```kotlin
+fun choices(name: String, vararg choices: ChoiceConfigurable): ModeValue
+```
+
+## Value Modifiers
+
+### Conditional Visibility
+
+```kotlin
+val enabled by boolean("Enabled", true)
+val speed by float("Speed", 1.0f, 0.1f..5.0f)
+    .listen { enabled } // Only visible when enabled is true
+```
+
+### Change Listeners
+
+```kotlin
+val mode by choices("Mode", modes, "Fast")
+    .onChange { newValue ->
+        // React to value change
+        println("Mode changed to: $newValue")
+        newValue // Must return value
+    }
+```
+
+### Changed Listeners
+
+```kotlin
+val range by float("Range", 3.0f, 1.0f..6.0f)
+    .onChanged { newValue ->
+        // Called after value changed
+        updateRangeDisplay(newValue)
+    }
+```
+
+### Not An Option
+
+```kotlin
+val internal by boolean("Internal", true)
+    .notAnOption() // Hidden from REST API
+```
+
+### Do Not Include
+
+```kotlin
+val temporary by text("Temp", "")
+    .doNotIncludeAlways() // Never saved to config
+```
+
+### Immutable
+
+```kotlin
+val constant by int("Version", 1)
+    .immutable() // Cannot be changed
+```
+
+## Advanced Value Types
+
+### Vec3 Value
+
+```kotlin
+val position by vec3("Position", Vec3(0.0, 64.0, 0.0))
+```
+
+Three-dimensional vector (X, Y, Z).
+
+### File Value
+
+```kotlin
+val configFile by file("Config", File("config.json"))
+```
+
+File path selector.
+
+### Multi-Choice List
+
+```kotlin
+val blocks by multiChoice("Blocks", mutableListOf("Stone", "Dirt"))
+```
+
+Multiple selection from list.
+
+## Value Groups
+
+### Tree Structure
+
+```kotlin
+object MyModule : ClientModule(...) {
+    val tree by tree("Advanced") {
+        val option1 by boolean("Option1", true)
+        val option2 by float("Option2", 1.0f, 0.1f..5.0f)
+    }
+}
+```
+
+Collapsible setting groups.
+
+### Toggleable Group
+
+```kotlin
+val autoBlock by toggleable("AutoBlock", false) {
+    val blockDelay by int("Delay", 50, 0..500)
+    val onlyWhileSprinting by boolean("OnlyWhileSprinting", false)
+}
+```
+
+Group with enable/disable toggle.
+
+## Usage Examples
+
+### Complete Module Settings
+
+```kotlin
+object ModuleKillAura : ClientModule(
+    name = "KillAura",
+    category = ModuleCategories.COMBAT
+) {
+    // Range settings
+    val range by floatRange("Range", 3.0f..4.2f, 1.0f..6.0f)
+    
+    // Target selection
+    val priority by choices("Priority", 
+        arrayOf("Distance", "Health", "Direction", "Armor"),
+        "Distance"
+    )
+    
+    // Attack settings
+    val maxCPS by int("MaxCPS", 12, 1..20)
+    val minCPS by int("MinCPS", 8, 1..20)
+        .listen { it <= maxCPS }
+    
+    // Rotation settings  
+    val rotations by toggleable("Rotations", true) {
+        val speed by float("Speed", 2.0f, 0.1f..180.0f)
+        val smoothing by boolean("Smoothing", true)
+    }
+    
+    // Mode selection with sub-settings
+    private val modes = choices("Mode", Single, Multi)
+    
+    object Single : ChoiceConfigurable(this, "Single") {
+        val switchDelay by int("SwitchDelay", 15, 1..40)
+    }
+    
+    object Multi : ChoiceConfigurable(this, "Multi") {
+        val maxTargets by int("MaxTargets", 3, 1..10)
+    }
+}
+```
+
+### Dynamic Value Visibility
+
+```kotlin
+val useCustomSpeed by boolean("UseCustomSpeed", false)
+val customSpeed by float("CustomSpeed", 1.0f, 0.1f..5.0f)
+    .listen { useCustomSpeed } // Only show when enabled
+
+val mode by choices("Mode", arrayOf("Fast", "Slow"), "Fast")
+val fastModeBoost by float("Boost", 2.0f, 1.0f..5.0f)
+    .listen { mode == "Fast" } // Only for Fast mode
+```
+
+### Value Change Reactions
+
+```kotlin
+val autoRespawn by boolean("AutoRespawn", true)
+    .onChanged { enabled ->
+        if (enabled && player.health <= 0) {
+            player.respawn()
+        }
+    }
+
+val theme by choices("Theme", arrayOf("Dark", "Light"), "Dark")
+    .onChange { newTheme ->
+        applyTheme(newTheme)
+        newTheme
+    }
+```
+
+## Best Practices
+
+1. **Use descriptive names** - Value names appear in UI
+2. **Set reasonable ranges** - Prevent invalid values
+3. **Add change listeners** - React to setting changes
+4. **Group related settings** - Use trees and toggleables
+5. **Use modes for variants** - Different strategies/algorithms
+6. **Validate dependencies** - Use `listen` for conditional visibility
+7. **Provide defaults** - Sensible default values
+8. **Add aliases for migration** - Support config updates
+
+## See Also
+
+- [ConfigSystem](/api/config-system) - Configuration management
+- [ClientModule](/api/client-module) - Module settings
+- [ValueGroup](/api/value-types) - Organizing values

@@ -1,0 +1,480 @@
+---
+title: Creating Custom Commands
+description: Build custom commands for the LiquidBounce command system
+icon: terminal
+---
+
+## Overview
+
+Commands allow you to add custom chat-based functionality to LiquidBounce. Script commands integrate with the built-in command system and support parameters, subcommands, and autocompletion.
+
+## Basic Command Structure
+
+Use `script.registerCommand()` to create a new command:
+
+```javascript
+var script = registerScript({
+    name: "MyCommands",
+    version: "1.0.0",
+    authors: ["Developer"]
+});
+
+script.registerCommand({
+    name: "greet",
+    aliases: ["hello", "hi"],
+    onExecute: function() {
+        Client.displayChatMessage("§aHello, World!");
+    }
+});
+```
+
+Usage: `.greet`, `.hello`, or `.hi`
+
+## Command Configuration
+
+<ParamField path="name" type="string" required>
+  The primary command name (used as `.name`)
+</ParamField>
+
+<ParamField path="aliases" type="string[]">
+  Optional alternative names for the command
+</ParamField>
+
+<ParamField path="parameters" type="Parameter[]">
+  Array of parameter definitions (see [Parameters](#parameters))
+</ParamField>
+
+<ParamField path="subcommands" type="Command[]">
+  Nested subcommands (see [Subcommands](#subcommands))
+</ParamField>
+
+<ParamField path="onExecute" type="function">
+  Handler function called when command is executed
+</ParamField>
+
+<ParamField path="hub" type="boolean">
+  If true, shows subcommand list when executed without arguments
+</ParamField>
+
+## Parameters
+
+Add parameters to accept user input:
+
+```javascript
+script.registerCommand({
+    name: "say",
+    parameters: [
+        {
+            name: "message",
+            required: true
+        }
+    ],
+    onExecute: function(message) {
+        Client.displayChatMessage("§7You said: " + message);
+    }
+});
+```
+
+Usage: `.say Hello everyone!`
+
+### Parameter Options
+
+<ParamField path="name" type="string" required>
+  Parameter name (used for display and debugging)
+</ParamField>
+
+<ParamField path="required" type="boolean">
+  Whether this parameter must be provided (default: `false`)
+</ParamField>
+
+<ParamField path="vararg" type="boolean">
+  If true, captures all remaining arguments as one string (default: `false`)
+</ParamField>
+
+<ParamField path="getCompletions" type="function">
+  Function that returns autocomplete suggestions:
+  ```javascript
+  getCompletions: function(begin, args) {
+      return ["option1", "option2", "option3"];
+  }
+  ```
+</ParamField>
+
+<ParamField path="validate" type="function">
+  Custom validation function:
+  ```javascript
+  validate: function(param) {
+      var num = parseInt(param);
+      if (isNaN(num)) {
+          return { accept: false, error: "Must be a number" };
+      }
+      return { accept: true, value: num };
+  }
+  ```
+</ParamField>
+
+### Parameter Examples
+
+<Tabs>
+  <Tab title="Required Parameter">
+    ```javascript
+    script.registerCommand({
+        name: "teleport",
+        parameters: [
+            { name: "x", required: true },
+            { name: "y", required: true },
+            { name: "z", required: true }
+        ],
+        onExecute: function(x, y, z) {
+            var player = mc.player;
+            if (player) {
+                player.setPos(parseFloat(x), parseFloat(y), parseFloat(z));
+                Client.displayChatMessage("§aTeleported!");
+            }
+        }
+    });
+    ```
+    Usage: `.teleport 100 64 200`
+  </Tab>
+  
+  <Tab title="Optional Parameter">
+    ```javascript
+    script.registerCommand({
+        name: "fly",
+        parameters: [
+            { name: "speed", required: false }
+        ],
+        onExecute: function(speed) {
+            var flySpeed = speed ? parseFloat(speed) : 1.0;
+            Client.displayChatMessage("§aFly speed set to " + flySpeed);
+        }
+    });
+    ```
+    Usage: `.fly` or `.fly 2.5`
+  </Tab>
+  
+  <Tab title="Vararg Parameter">
+    ```javascript
+    script.registerCommand({
+        name: "broadcast",
+        parameters: [
+            { name: "message", required: true, vararg: true }
+        ],
+        onExecute: function(message) {
+            // Message contains all remaining arguments
+            Client.displayChatMessage("§b[Broadcast] " + message);
+        }
+    });
+    ```
+    Usage: `.broadcast This is a long message with spaces`
+  </Tab>
+  
+  <Tab title="Validated Parameter">
+    ```javascript
+    script.registerCommand({
+        name: "damage",
+        parameters: [
+            {
+                name: "amount",
+                required: true,
+                validate: function(param) {
+                    var num = parseFloat(param);
+                    if (isNaN(num) || num < 0 || num > 20) {
+                        return {
+                            accept: false,
+                            error: "Amount must be between 0 and 20"
+                        };
+                    }
+                    return { accept: true, value: num };
+                }
+            }
+        ],
+        onExecute: function(amount) {
+            Client.displayChatMessage("§cDamage: " + amount);
+        }
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Autocomplete Parameter">
+    ```javascript
+    script.registerCommand({
+        name: "gamemode",
+        parameters: [
+            {
+                name: "mode",
+                required: true,
+                getCompletions: function(begin, args) {
+                    return ["survival", "creative", "adventure", "spectator"]
+                        .filter(function(mode) {
+                            return mode.startsWith(begin.toLowerCase());
+                        });
+                }
+            }
+        ],
+        onExecute: function(mode) {
+            Client.displayChatMessage("§aSwitching to " + mode + " mode");
+        }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Subcommands
+
+Create complex command hierarchies:
+
+```javascript
+script.registerCommand({
+    name: "config",
+    hub: true,
+    subcommands: [
+        {
+            name: "save",
+            onExecute: function() {
+                Client.configSystem.save();
+                Client.displayChatMessage("§aConfig saved!");
+            }
+        },
+        {
+            name: "load",
+            onExecute: function() {
+                Client.configSystem.load();
+                Client.displayChatMessage("§aConfig loaded!");
+            }
+        },
+        {
+            name: "reset",
+            parameters: [
+                { name: "confirm", required: true }
+            ],
+            onExecute: function(confirm) {
+                if (confirm === "yes") {
+                    Client.displayChatMessage("§cConfig reset!");
+                } else {
+                    Client.displayChatMessage("§eUse 'config reset yes' to confirm");
+                }
+            }
+        }
+    ]
+});
+```
+
+Usage:
+- `.config` - Shows available subcommands (because `hub: true`)
+- `.config save` - Saves configuration
+- `.config load` - Loads configuration  
+- `.config reset yes` - Resets with confirmation
+
+## Complete Examples
+
+### Example 1: Info Command
+
+```javascript
+var script = registerScript({
+    name: "InfoCommands",
+    version: "1.0.0",
+    authors: ["Developer"]
+});
+
+script.registerCommand({
+    name: "info",
+    aliases: ["i"],
+    hub: true,
+    subcommands: [
+        {
+            name: "position",
+            aliases: ["pos"],
+            onExecute: function() {
+                var player = mc.player;
+                if (!player) {
+                    Client.displayChatMessage("§cNot in game!");
+                    return;
+                }
+                var pos = player.position();
+                Client.displayChatMessage(
+                    "§7Position: §f" + 
+                    pos.x.toFixed(2) + " " + 
+                    pos.y.toFixed(2) + " " + 
+                    pos.z.toFixed(2)
+                );
+            }
+        },
+        {
+            name: "health",
+            aliases: ["hp"],
+            onExecute: function() {
+                var player = mc.player;
+                if (!player) {
+                    Client.displayChatMessage("§cNot in game!");
+                    return;
+                }
+                var health = player.getHealth();
+                var maxHealth = player.getMaxHealth();
+                Client.displayChatMessage(
+                    "§7Health: §c" + health.toFixed(1) + 
+                    "§7/§c" + maxHealth.toFixed(1)
+                );
+            }
+        },
+        {
+            name: "ping",
+            onExecute: function() {
+                var connection = mc.getConnection();
+                if (!connection) {
+                    Client.displayChatMessage("§cNot connected to server!");
+                    return;
+                }
+                var latency = connection.getLatency();
+                Client.displayChatMessage("§7Ping: §a" + latency + "ms");
+            }
+        }
+    ]
+});
+```
+
+### Example 2: Module Control Command
+
+```javascript
+script.registerCommand({
+    name: "module",
+    aliases: ["mod", "m"],
+    hub: true,
+    subcommands: [
+        {
+            name: "toggle",
+            aliases: ["t"],
+            parameters: [
+                {
+                    name: "moduleName",
+                    required: true,
+                    getCompletions: function(begin) {
+                        var modules = Client.moduleManager.getModules();
+                        return modules
+                            .map(function(m) { return m.name; })
+                            .filter(function(name) {
+                                return name.toLowerCase().startsWith(begin.toLowerCase());
+                            });
+                    }
+                }
+            ],
+            onExecute: function(moduleName) {
+                var module = Client.moduleManager.getModule(moduleName);
+                if (!module) {
+                    Client.displayChatMessage("§cModule not found: " + moduleName);
+                    return;
+                }
+                module.enabled = !module.enabled;
+                var state = module.enabled ? "§aenabled" : "§cdisabled";
+                Client.displayChatMessage("§7Module " + moduleName + " " + state);
+            }
+        },
+        {
+            name: "list",
+            aliases: ["l"],
+            parameters: [
+                {
+                    name: "category",
+                    required: false,
+                    getCompletions: function() {
+                        return ["Combat", "Movement", "Player", "World", "Render", "Misc"];
+                    }
+                }
+            ],
+            onExecute: function(category) {
+                var modules = Client.moduleManager.getModules();
+                if (category) {
+                    modules = modules.filter(function(m) {
+                        return m.category.name === category;
+                    });
+                }
+                Client.displayChatMessage("§7Modules: " + modules.length);
+                modules.forEach(function(m) {
+                    var state = m.enabled ? "§a✓" : "§c✗";
+                    Client.displayChatMessage("  " + state + " §f" + m.name);
+                });
+            }
+        }
+    ]
+});
+```
+
+## Accessing Arguments
+
+Parameters are passed to `onExecute` in order:
+
+```javascript
+script.registerCommand({
+    name: "example",
+    parameters: [
+        { name: "first", required: true },
+        { name: "second", required: false },
+        { name: "rest", vararg: true }
+    ],
+    onExecute: function(first, second, rest) {
+        Client.displayChatMessage("First: " + first);
+        Client.displayChatMessage("Second: " + (second || "none"));
+        Client.displayChatMessage("Rest: " + (rest || "none"));
+    }
+});
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Validate input">
+    Always validate and handle invalid input gracefully:
+    ```javascript
+    onExecute: function(param) {
+        if (!param) {
+            Client.displayChatMessage("§cUsage: .command <param>");
+            return;
+        }
+        // Process valid input
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Provide feedback">
+    Always inform the user what happened:
+    ```javascript
+    Client.displayChatMessage("§aOperation successful!");
+    // or
+    Client.displayChatMessage("§cOperation failed: reason");
+    ```
+  </Accordion>
+
+  <Accordion title="Use hub for complex commands">
+    For commands with many subcommands, set `hub: true` to show help:
+    ```javascript
+    {
+        name: "mycommand",
+        hub: true,
+        subcommands: [...]
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Implement autocomplete">
+    Provide `getCompletions` for better user experience:
+    ```javascript
+    getCompletions: function(begin, args) {
+        return possibleValues.filter(function(v) {
+            return v.startsWith(begin);
+        });
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/scripting/api-reference">
+    Explore available utilities and functions
+  </Card>
+  
+  <Card title="Creating Modules" icon="cube" href="/scripting/creating-modules">
+    Learn about creating custom modules
+  </Card>
+</CardGroup>

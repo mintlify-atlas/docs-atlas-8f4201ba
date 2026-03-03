@@ -1,0 +1,621 @@
+---
+title: Script API Reference
+description: Complete reference for the LiquidBounce scripting API
+icon: book
+---
+
+## Overview
+
+The LiquidBounce Script API provides a comprehensive set of utilities, bindings, and helpers for creating powerful scripts. This reference documents all available APIs.
+
+## Global Bindings
+
+These objects and functions are available globally in all scripts:
+
+### Core Functions
+
+<ResponseField name="registerScript" type="function" required>
+  Registers your script with LiquidBounce.
+  
+  ```javascript
+  var script = registerScript({
+      name: "MyScript",
+      version: "1.0.0",
+      authors: ["Developer"]
+  });
+  ```
+  
+  **Source:** `PolyglotScript.kt:77` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/PolyglotScript.kt:77)
+</ResponseField>
+
+### Client API
+
+<ResponseField name="Client" type="object">
+  Main client API hub providing access to managers and utilities.
+  
+  ```javascript
+  Client.moduleManager     // Access modules
+  Client.commandManager    // Access commands
+  Client.eventManager      // Access event system
+  Client.configSystem      // Access configuration
+  Client.scriptManager     // Access script manager
+  Client.combatManager     // Access combat utilities
+  ```
+  
+  **Source:** `ScriptClient.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptClient.kt)
+</ResponseField>
+
+<ParamField path="Client.displayChatMessage" type="function">
+  Display a message in the client chat.
+  
+  ```javascript
+  Client.displayChatMessage("§aHello World!");
+  ```
+</ParamField>
+
+<ParamField path="Client.moduleManager" type="ModuleManager">
+  Access and manage modules.
+  
+  ```javascript
+  var killAura = Client.moduleManager.getModule("KillAura");
+  if (killAura) {
+      killAura.enabled = true;
+  }
+  
+  // Get all modules
+  var allModules = Client.moduleManager.getModules();
+  ```
+</ParamField>
+
+<ParamField path="Client.commandManager" type="CommandManager">
+  Access command system.
+  
+  ```javascript
+  Client.commandManager.executeCommand(".help");
+  ```
+</ParamField>
+
+<ParamField path="Client.eventManager" type="EventManager">
+  Access the event system.
+  
+  ```javascript
+  Client.eventManager.callEvent(someEvent);
+  ```
+</ParamField>
+
+### Minecraft Instance
+
+<ResponseField name="mc" type="Minecraft">
+  Direct access to the Minecraft client instance.
+  
+  ```javascript
+  var player = mc.player;           // Local player
+  var level = mc.level;             // Current world/level
+  var connection = mc.getConnection(); // Network connection
+  
+  // Execute on main thread
+  mc.execute(function() {
+      // Code runs on main thread
+  });
+  ```
+  
+  **Source:** `ScriptContextProvider.kt:59` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptContextProvider.kt:59)
+</ResponseField>
+
+### Setting Builder
+
+<ResponseField name="Setting" type="object">
+  Create module settings/values.
+  
+  ```javascript
+  settings: {
+      speed: Setting.float({
+          name: "Speed",
+          default: 1.0,
+          range: [0.1, 5.0],
+          suffix: "x"
+      }),
+      enabled: Setting.boolean({
+          name: "Enabled",
+          default: true
+      })
+  }
+  ```
+  
+  **Available types:**
+  - `Setting.boolean(config)` - Boolean value
+  - `Setting.int(config)` - Integer with range
+  - `Setting.float(config)` - Float with range
+  - `Setting.intRange(config)` - Integer range
+  - `Setting.floatRange(config)` - Float range
+  - `Setting.text(config)` - Text input
+  - `Setting.choose(config)` - Single choice
+  - `Setting.multiChoose(config)` - Multiple choices
+  - `Setting.key(config)` - Key binding
+  
+  **Source:** `ScriptSetting.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/features/ScriptSetting.kt)
+</ResponseField>
+
+## Utility APIs
+
+These utility objects provide helper functions:
+
+### RotationUtil
+
+<ResponseField name="RotationUtil" type="object">
+  Rotation and aiming utilities.
+  
+  ```javascript
+  // Create rotation to entity (center of bounding box)
+  var rotation = RotationUtil.newRotationEntity(entity);
+  
+  // Create raytraced rotation (best spot)
+  var rotation = RotationUtil.newRaytracedRotationEntity(
+      entity,
+      4.2,    // range
+      0.0     // through walls range
+  );
+  
+  // Aim at rotation
+  RotationUtil.aimAtRotation(rotation, true); // true = fix velocity
+  ```
+  
+  **Source:** `ScriptRotationUtil.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptRotationUtil.kt)
+</ResponseField>
+
+<ParamField path="RotationUtil.newRotationEntity" type="function">
+  Creates a rotation targeting the center of an entity's bounding box.
+  
+  **Parameters:**
+  - `entity: Entity` - Target entity
+  
+  **Returns:** `Rotation` - Rotation object
+  
+  **Performance:** Very fast (no raytracing)
+</ParamField>
+
+<ParamField path="RotationUtil.newRaytracedRotationEntity" type="function">
+  Creates an optimal rotation using raytracing.
+  
+  **Parameters:**
+  - `entity: Entity` - Target entity
+  - `range: number` - Maximum range
+  - `throughWallsRange: number` - Range through walls
+  
+  **Returns:** `Rotation | null` - Best rotation or null if no valid spot
+  
+  **Performance:** Slower (uses raytracing)
+</ParamField>
+
+<ParamField path="RotationUtil.aimAtRotation" type="function">
+  Aims at a rotation using the rotation manager.
+  
+  **Parameters:**
+  - `rotation: Rotation` - Target rotation
+  - `fixVelocity: boolean` - Whether to apply movement correction
+</ParamField>
+
+### ItemUtil
+
+<ResponseField name="ItemUtil" type="object">
+  Item and inventory utilities.
+  
+  ```javascript
+  // Check if item is a weapon
+  var isWeapon = ItemUtil.isWeapon(itemStack);
+  
+  // Get item from hotbar
+  var slot = ItemUtil.findHotbarSlot(function(stack) {
+      return stack.getItem() === Items.GOLDEN_APPLE;
+  });
+  ```
+  
+  **Source:** `ScriptItemUtil.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptItemUtil.kt)
+</ResponseField>
+
+### NetworkUtil
+
+<ResponseField name="NetworkUtil" type="object">
+  Network packet utilities.
+  
+  ```javascript
+  // Send packet to server
+  NetworkUtil.sendPacket(packet);
+  
+  // Send packet silently (bypass client handlers)
+  NetworkUtil.sendPacketSilently(packet);
+  ```
+  
+  **Source:** `ScriptNetworkUtil.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptNetworkUtil.kt)
+</ResponseField>
+
+### MovementUtil
+
+<ResponseField name="MovementUtil" type="object">
+  Player movement utilities.
+  
+  ```javascript
+  // Get player speed
+  var speed = MovementUtil.getSpeed();
+  
+  // Apply movement
+  MovementUtil.strafe(speed);
+  ```
+  
+  **Source:** `ScriptMovementUtil.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptMovementUtil.kt)
+</ResponseField>
+
+### BlockUtil
+
+<ResponseField name="BlockUtil" type="object">
+  Block and world utilities.
+  
+  ```javascript
+  // Get block at position
+  var block = BlockUtil.getBlock(blockPos);
+  
+  // Check if block is solid
+  var isSolid = BlockUtil.isSolid(blockPos);
+  ```
+  
+  **Source:** `ScriptBlockUtil.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptBlockUtil.kt)
+</ResponseField>
+
+### InteractionUtil
+
+<ResponseField name="InteractionUtil" type="object">
+  Player interaction utilities.
+  
+  ```javascript
+  // Interact with entity
+  InteractionUtil.interactEntity(entity, hand);
+  
+  // Attack entity
+  InteractionUtil.attackEntity(entity);
+  ```
+  
+  **Source:** `ScriptInteractionUtil.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptInteractionUtil.kt)
+</ResponseField>
+
+### ReflectionUtil
+
+<ResponseField name="ReflectionUtil" type="object">
+  Java reflection utilities for advanced usage.
+  
+  ```javascript
+  // Access private fields and methods
+  var field = ReflectionUtil.getField(object, "fieldName");
+  var method = ReflectionUtil.getMethod(object, "methodName");
+  ```
+  
+  **Source:** `ScriptReflectionUtil.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptReflectionUtil.kt)
+</ResponseField>
+
+## Minecraft Classes
+
+These Minecraft classes are available for direct use:
+
+<ResponseField name="Vec3d" type="class">
+  3D vector with doubles.
+  
+  ```javascript
+  var vec = new Vec3d(x, y, z);
+  var length = vec.length();
+  var normalized = vec.normalize();
+  ```
+</ResponseField>
+
+<ResponseField name="Vec3i" type="class">
+  3D vector with integers.
+  
+  ```javascript
+  var vec = new Vec3i(x, y, z);
+  ```
+</ResponseField>
+
+<ResponseField name="BlockPos" type="class">
+  Block position in the world.
+  
+  ```javascript
+  var pos = new BlockPos(x, y, z);
+  var block = mc.level.getBlockState(pos).getBlock();
+  ```
+</ResponseField>
+
+<ResponseField name="Hand" type="enum">
+  Player hand enumeration.
+  
+  ```javascript
+  var mainHand = Hand.MAIN_HAND;
+  var offHand = Hand.OFF_HAND;
+  ```
+</ResponseField>
+
+<ResponseField name="MathHelper" type="class">
+  Math utilities.
+  
+  ```javascript
+  var clamped = MathHelper.clamp(value, min, max);
+  var wrapped = MathHelper.wrapDegrees(angle);
+  ```
+</ResponseField>
+
+## Advanced Features
+
+### Local Storage
+
+<ResponseField name="localStorage" type="object">
+  Persistent storage across script reloads (within same session).
+  
+  ```javascript
+  // Store data
+  localStorage.myValue = 123;
+  localStorage.myArray = [1, 2, 3];
+  
+  // Retrieve data
+  var value = localStorage.myValue;
+  ```
+  
+  <Warning>
+  localStorage is cleared when scripts are unloaded or client restarts.
+  </Warning>
+  
+  **Source:** `ScriptContextProvider.kt:38` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptContextProvider.kt:38)
+</ResponseField>
+
+### Async Utilities (JavaScript)
+
+<ResponseField name="AsyncUtil" type="object">
+  Async/Promise utilities for JavaScript.
+  
+  ```javascript
+  // Schedule task on next tick
+  AsyncUtil.scheduleTask(function() {
+      Client.displayChatMessage("Next tick!");
+  });
+  
+  // Use with Promises
+  AsyncUtil.createPromise(function(resolve, reject) {
+      // Async operation
+      resolve(result);
+  });
+  ```
+  
+  **Source:** `ScriptAsyncUtil.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptAsyncUtil.kt)
+</ResponseField>
+
+### Thread Management
+
+<ResponseField name="UnsafeThread" type="object">
+  Thread creation utilities.
+  
+  ```javascript
+  // Create background thread
+  UnsafeThread.run(function() {
+      // Background task
+      // Note: Cannot access Minecraft objects here!
+  });
+  ```
+  
+  <Warning>
+  Do not access Minecraft game objects from background threads. Use `mc.execute()` to run code on the main thread.
+  </Warning>
+  
+  **Source:** `ScriptUnsafeThread.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptUnsafeThread.kt)
+</ResponseField>
+
+### Parameter Validation
+
+<ResponseField name="ParameterValidator" type="object">
+  Helpers for validating command parameters.
+  
+  ```javascript
+  // Validate integer
+  var result = ParameterValidator.validateInt("123", 0, 100);
+  if (result.accept) {
+      var value = result.value;
+  }
+  ```
+  
+  **Source:** `ScriptParameterValidator.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptParameterValidator.kt)
+</ResponseField>
+
+## Script Object Methods
+
+The script object returned by `registerScript()` provides these methods:
+
+<ResponseField name="script.registerModule" type="function">
+  Register a custom module.
+  
+  ```javascript
+  script.registerModule(config, callback);
+  ```
+  
+  See: [Creating Modules](/scripting/creating-modules)
+</ResponseField>
+
+<ResponseField name="script.registerCommand" type="function">
+  Register a custom command.
+  
+  ```javascript
+  script.registerCommand(config);
+  ```
+  
+  See: [Creating Commands](/scripting/creating-commands)
+</ResponseField>
+
+<ResponseField name="script.on" type="function">
+  Register global script lifecycle events.
+  
+  ```javascript
+  script.on("load", function() { });
+  script.on("enable", function() { });
+  script.on("disable", function() { });
+  ```
+  
+  **Source:** `PolyglotScript.kt:286` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/PolyglotScript.kt:286)
+</ResponseField>
+
+## Type Support
+
+### Primitives
+
+<ResponseField name="Primitives" type="object">
+  Java primitive type helpers.
+  
+  ```javascript
+  var intClass = Primitives.INT;
+  var boolClass = Primitives.BOOLEAN;
+  ```
+  
+  **Source:** `ScriptPrimitives.kt` (~/workspace/source/src/main/kotlin/net/ccbluex/liquidbounce/script/bindings/api/ScriptPrimitives.kt)
+</ResponseField>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Type Safety">
+    Always check types before operations:
+    ```javascript
+    if (mc.player !== null && mc.player !== undefined) {
+        // Safe to use mc.player
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    Wrap API calls in try-catch:
+    ```javascript
+    try {
+        var module = Client.moduleManager.getModule("MyModule");
+        module.enabled = true;
+    } catch (e) {
+        Client.displayChatMessage("§cError: " + e.message);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Performance">
+    Cache frequently accessed values:
+    ```javascript
+    // Bad: Accesses mc.player every tick
+    module.on("playerTick", function() {
+        if (mc.player.getHealth() < 10) { }
+    });
+    
+    // Good: Caches player reference
+    module.on("playerTick", function() {
+        var player = mc.player;
+        if (!player) return;
+        if (player.getHealth() < 10) { }
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Main Thread Access">
+    Always use `mc.execute()` for thread-safe operations:
+    ```javascript
+    UnsafeThread.run(function() {
+        // Background processing
+        var result = heavyComputation();
+        
+        // Access Minecraft on main thread
+        mc.execute(function() {
+            Client.displayChatMessage("Result: " + result);
+        });
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Complete API Example
+
+```javascript
+var script = registerScript({
+    name: "APIDemo",
+    version: "1.0.0",
+    authors: ["Developer"]
+});
+
+script.registerModule({
+    name: "APIDemo",
+    category: "Misc",
+    settings: {
+        range: Setting.float({
+            name: "Range",
+            default: 4.2,
+            range: [1.0, 6.0]
+        })
+    }
+}, function(module) {
+    
+    module.on("enable", function() {
+        Client.displayChatMessage("§aAPI Demo enabled!");
+        
+        // Store in localStorage
+        localStorage.demoEnabled = true;
+    });
+    
+    module.on("playerTick", function() {
+        var player = mc.player;
+        if (!player) return;
+        
+        var level = mc.level;
+        if (!level) return;
+        
+        // Get nearby entities
+        var entities = level.getEntities();
+        var range = module.settings.range.get();
+        
+        entities.forEach(function(entity) {
+            if (entity === player) return;
+            
+            var distance = player.distanceTo(entity);
+            if (distance <= range) {
+                // Create rotation
+                var rotation = RotationUtil.newRotationEntity(entity);
+                
+                // Aim at entity
+                RotationUtil.aimAtRotation(rotation, true);
+                
+                // Update tag
+                module.tag = entity.getName().getString();
+            }
+        });
+    });
+    
+});
+
+script.registerCommand({
+    name: "apidemo",
+    parameters: [
+        { name: "action", required: true }
+    ],
+    onExecute: function(action) {
+        if (action === "status") {
+            var enabled = localStorage.demoEnabled || false;
+            Client.displayChatMessage("§7Demo enabled: " + enabled);
+        }
+    }
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/scripting/getting-started">
+    Learn the basics of scripting
+  </Card>
+  
+  <Card title="Creating Modules" icon="cube" href="/scripting/creating-modules">
+    Build custom modules
+  </Card>
+  
+  <Card title="Working with Events" icon="bolt" href="/scripting/events">
+    Handle game events
+  </Card>
+  
+  <Card title="Creating Commands" icon="terminal" href="/scripting/creating-commands">
+    Build custom commands
+  </Card>
+</CardGroup>

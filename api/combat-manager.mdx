@@ -1,0 +1,311 @@
+---
+title: "CombatManager"
+description: "Manages combat state, rotation pausing, and attack tracking"
+---
+
+## Overview
+
+The `CombatManager` tracks combat state and manages pausing of combat-related features like rotations and attacking. It provides utilities for coordinating multiple combat modules.
+
+**Package:** `net.ccbluex.liquidbounce.utils.combat`
+
+## Object Declaration
+
+```kotlin
+object CombatManager : EventListener
+```
+
+## Constants
+
+<ParamField path="PAUSE_COMBAT" type="Int" default="40">
+  Default combat pause duration (40 ticks = 2 seconds).
+  
+  ```kotlin
+  const val PAUSE_COMBAT = 40
+  ```
+</ParamField>
+
+## Properties
+
+<ParamField path="duringCombat" type="Int">
+  Ticks remaining in combat state.
+  
+  ```kotlin
+  var duringCombat: Int
+  ```
+  
+  Automatically decrements each tick.
+</ParamField>
+
+<ParamField path="shouldPauseCombat" type="Boolean">
+  Whether combat actions should be paused.
+  
+  ```kotlin
+  val shouldPauseCombat: Boolean
+  ```
+</ParamField>
+
+<ParamField path="shouldPauseRotation" type="Boolean">
+  Whether rotation updates should be paused.
+  
+  ```kotlin
+  val shouldPauseRotation: Boolean
+  ```
+</ParamField>
+
+<ParamField path="shouldPauseBlocking" type="Boolean">
+  Whether blocking actions should be paused.
+  
+  ```kotlin
+  val shouldPauseBlocking: Boolean
+  ```
+</ParamField>
+
+<ParamField path="isInCombat" type="Boolean">
+  Whether player is currently in combat.
+  
+  ```kotlin
+  val isInCombat: Boolean
+  ```
+  
+  True if `duringCombat > 0` or KillAura has a target.
+</ParamField>
+
+## Core Methods
+
+### pauseCombatForAtLeast
+
+```kotlin
+fun pauseCombatForAtLeast(pauseTime: Int)
+```
+
+Pauses combat for at least the specified number of ticks.
+
+<ParamField path="pauseTime" type="Int" required>
+  Minimum number of ticks to pause
+</ParamField>
+
+**Example:**
+```kotlin
+// Pause combat while eating
+CombatManager.pauseCombatForAtLeast(40) // 2 seconds
+```
+
+### pauseRotationForAtLeast
+
+```kotlin
+fun pauseRotationForAtLeast(pauseTime: Int)
+```
+
+Pauses rotation updates for at least the specified number of ticks.
+
+<ParamField path="pauseTime" type="Int" required>
+  Minimum number of ticks to pause
+</ParamField>
+
+**Example:**
+```kotlin
+// Pause rotations while throwing pearl
+CombatManager.pauseRotationForAtLeast(20) // 1 second
+```
+
+### pauseBlockingForAtLeast
+
+```kotlin
+fun pauseBlockingForAtLeast(pauseTime: Int)
+```
+
+Pauses blocking for at least the specified number of ticks.
+
+<ParamField path="pauseTime" type="Int" required>
+  Minimum number of ticks to pause
+</ParamField>
+
+## Usage Examples
+
+### Pausing During Potion Use
+
+```kotlin
+object ModuleAutoPot : ClientModule(...) {
+    private fun throwPotion() {
+        // Pause combat while throwing
+        CombatManager.pauseCombatForAtLeast(10)
+        CombatManager.pauseRotationForAtLeast(10)
+        
+        // Throw potion
+        throwSplashPotion()
+    }
+}
+```
+
+### Checking Combat State
+
+```kotlin
+object ModuleSafeWalk : ClientModule(...) {
+    private val safeWalkHandler = handler<PlayerSafeWalkEvent> { event ->
+        // Only safe walk when not in combat
+        if (!CombatManager.isInCombat) {
+            event.isSafeWalk = true
+        }
+    }
+}
+```
+
+### Respecting Combat Pause
+
+```kotlin
+object ModuleKillAura : ClientModule(...) {
+    private val tickHandler = handler<GameTickEvent> {
+        // Don't attack if combat is paused
+        if (CombatManager.shouldPauseCombat) {
+            return@handler
+        }
+        
+        // Attack logic
+        val target = findTarget()
+        if (target != null) {
+            attack(target)
+        }
+    }
+}
+```
+
+### Respecting Rotation Pause
+
+```kotlin
+object ModuleAimbot : ClientModule(...) {
+    private val tickHandler = handler<GameTickEvent> {
+        // Don't update rotations if paused
+        if (CombatManager.shouldPauseRotation) {
+            return@handler
+        }
+        
+        // Rotation logic
+        val target = findTarget()
+        if (target != null) {
+            RotationManager.setRotationTarget(...)
+        }
+    }
+}
+```
+
+## Attack Tracking
+
+CombatManager tracks attacks to maintain combat state:
+
+```kotlin
+private val attackHandler = handler<AttackEntityEvent> { event ->
+    val entity = event.entity
+    
+    if (entity is LivingEntity && entity.shouldBeAttacked()) {
+        duringCombat = PAUSE_COMBAT
+        
+        if (entity is Player) {
+            EventManager.callEvent(TargetChangeEvent(PlayerData.fromPlayer(entity)))
+        }
+    }
+}
+```
+
+## Common Scenarios
+
+### Eating Food
+
+```kotlin
+// Pause combat while eating
+CombatManager.pauseCombatForAtLeast(32) // Duration of eating
+CombatManager.pauseRotationForAtLeast(32)
+```
+
+### Throwing Items
+
+```kotlin
+// Pause briefly for throw
+CombatManager.pauseRotationForAtLeast(5)
+```
+
+### Using Offhand
+
+```kotlin
+// Pause blocking while switching offhand
+CombatManager.pauseBlockingForAtLeast(10)
+```
+
+### Inventory Operations
+
+```kotlin
+// Pause combat during inventory actions
+CombatManager.pauseCombatForAtLeast(20)
+```
+
+## Integration with Modules
+
+### KillAura Integration
+
+```kotlin
+val isInCombat: Boolean
+    get() = this.duringCombat > 0 ||
+        (ModuleKillAura.running && ModuleKillAura.targetTracker.target != null)
+```
+
+CombatManager considers KillAura's target when determining combat state.
+
+### AutoPot Integration
+
+```kotlin
+object ModuleAutoPot : ClientModule(...) {
+    private fun shouldPot(): Boolean {
+        // Don't pot if not in combat
+        return CombatManager.isInCombat && player.health < threshold
+    }
+}
+```
+
+### AutoEat Integration
+
+```kotlin
+object ModuleAutoEat : ClientModule(...) {
+    private fun startEating() {
+        // Pause all combat during eating
+        CombatManager.pauseCombatForAtLeast(eatDuration)
+        CombatManager.pauseRotationForAtLeast(eatDuration)
+        CombatManager.pauseBlockingForAtLeast(eatDuration)
+    }
+}
+```
+
+## Best Practices
+
+1. **Check pause state** - Always check `shouldPauseCombat`/`shouldPauseRotation` before combat actions
+2. **Pause for full duration** - Account for entire action duration
+3. **Use appropriate pause type** - Only pause what's necessary
+4. **Coordinate with other modules** - Respect pause states from other modules
+5. **Use `pauseForAtLeast`** - Prevents overwriting longer pauses
+
+## Pause Duration Guidelines
+
+- **Item use:** 32 ticks (eating/drinking)
+- **Potion throw:** 10-20 ticks
+- **Inventory action:** 10-20 ticks  
+- **Brief interruption:** 5-10 ticks
+- **Extended action:** 40+ ticks
+
+## Combat State Tracking
+
+```kotlin
+// Check if player recently attacked
+if (CombatManager.duringCombat > 0) {
+    // Player attacked within last 2 seconds
+}
+
+// Check if player is actively fighting
+if (CombatManager.isInCombat) {
+    // Player is in active combat
+}
+```
+
+## See Also
+
+- [RotationManager](/api/rotation-manager) - Rotation management
+- [InventoryManager](/api/inventory-manager) - Inventory coordination
+- [ClientModule](/api/client-module) - Module implementation

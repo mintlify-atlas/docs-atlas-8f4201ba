@@ -1,0 +1,282 @@
+---
+title: Auto-Config System
+description: Automated configuration management with cloud synchronization
+icon: cloud
+---
+
+The Auto-Config system provides automated configuration management for LiquidBounce, allowing you to load pre-configured settings optimized for specific servers and protocols.
+
+## Overview
+
+Auto-Config enables you to:
+- Load server-specific configurations from the cloud
+- Serialize and share your own configurations
+- Automatically apply optimal settings for different protocols
+- Sync configurations with metadata and validation
+
+## Core Components
+
+### AutoConfig Object
+
+The main entry point for auto-configuration functionality is located at `AutoConfig.kt:61`.
+
+<CodeGroup>
+```kotlin Loading Auto Config
+suspend fun loadAutoConfig(autoConfig: AutoSettings) = withLoading {
+    ClientApi.requestSettingsScript(autoConfig.settingId).use(::loadAutoConfig)
+}
+```
+
+```kotlin Reloading Configs
+suspend fun reloadConfigs(): Boolean = try {
+    configs = ClientApi.requestSettingsList()
+    true
+} catch (e: Exception) {
+    logger.error("Failed to load auto configs", e)
+    false
+}
+```
+</CodeGroup>
+
+### Configuration Metadata
+
+Auto-Config stores comprehensive metadata about each configuration (`AutoConfigMetadata.kt:33`):
+
+<ParamField path="name" type="string" required>
+  Configuration identifier
+</ParamField>
+
+<ParamField path="author" type="string">
+  Creator of the configuration
+</ParamField>
+
+<ParamField path="serverAddress" type="string">
+  Target server domain
+</ParamField>
+
+<ParamField path="protocolName" type="string">
+  Minecraft protocol name (e.g., "1.20.1")
+</ParamField>
+
+<ParamField path="protocolVersion" type="int">
+  Protocol version number
+</ParamField>
+
+<ParamField path="clientVersion" type="string">
+  LiquidBounce version used
+</ParamField>
+
+<ParamField path="date" type="string">
+  Creation date
+</ParamField>
+
+<ParamField path="type" type="AutoSettingsType">
+  Configuration type (RAGE, LEGIT, etc.)
+</ParamField>
+
+<ParamField path="status" type="AutoSettingsStatusType">
+  Current status (BYPASSING, PATCHED, etc.)
+</ParamField>
+
+## Loading Configurations
+
+### From Cloud
+
+```kotlin
+// Reload available configs from API
+AutoConfig.reloadConfigs()
+
+// Load specific config
+val autoConfig: AutoSettings = configs[0]
+AutoConfig.loadAutoConfig(autoConfig)
+```
+
+### From File
+
+```kotlin
+val reader: Reader = File("config.json").reader()
+AutoConfig.loadAutoConfig(reader)
+```
+
+### From JSON
+
+```kotlin
+val jsonObject: JsonObject = parseConfigJson()
+AutoConfig.loadAutoConfig(jsonObject)
+```
+
+## Creating Auto-Configs
+
+### Serialization
+
+Create and export your current configuration:
+
+```kotlin
+val writer = File("my-config.json").writer()
+AutoConfig.serializeAutoConfig(
+    writer,
+    includeConfiguration = IncludeConfiguration(
+        includeBinds = true,
+        includeAction = false,
+        includeHidden = false
+    ),
+    autoSettingsType = AutoSettingsType.RAGE,
+    statusType = AutoSettingsStatusType.BYPASSING
+)
+```
+
+### Include Configuration
+
+Control what gets included in the serialized config (`IncludeConfiguration.kt:23`):
+
+<ResponseField name="includeBinds" type="boolean" default="false">
+  Include keybinds in the configuration
+</ResponseField>
+
+<ResponseField name="includeAction" type="boolean" default="false">
+  Include action settings
+</ResponseField>
+
+<ResponseField name="includeHidden" type="boolean" default="false">
+  Include hidden values
+</ResponseField>
+
+## Protocol Validation
+
+Auto-Config automatically validates protocol compatibility (`AutoConfig.kt:211`):
+
+<Steps>
+  <Step title="Protocol Detection">
+    Extracts protocol information from the configuration metadata
+  </Step>
+  
+  <Step title="Comparison">
+    Compares with your current protocol version
+  </Step>
+  
+  <Step title="ViaFabricPlus Integration">
+    Automatically switches protocol if ViaFabricPlus is installed
+  </Step>
+  
+  <Step title="User Notification">
+    Displays warnings if protocols don't match
+  </Step>
+</Steps>
+
+<Warning>
+  If the config protocol doesn't match your current protocol, you'll receive a notification. With ViaFabricPlus installed, the protocol can be automatically switched.
+</Warning>
+
+## Configuration Structure
+
+Auto-Config files support two main structures:
+
+### Full Auto-Config
+
+```json
+{
+  "name": "autoconfig",
+  "modules": { /* module settings */ },
+  "spoofers": { /* spoofer settings */ },
+  "author": "PlayerName",
+  "date": "03/03/2026",
+  "time": "14:30:00",
+  "clientVersion": "1.0.0",
+  "serverAddress": "example.com",
+  "protocolName": "1.20.1",
+  "protocolVersion": 763,
+  "type": "RAGE",
+  "status": "BYPASSING"
+}
+```
+
+### Modules-Only Config
+
+```json
+{
+  "name": "modules",
+  "value": [ /* module configurations */ ]
+}
+```
+
+## Cloud Sync
+
+Auto-Config integrates with the LiquidBounce API for cloud synchronization:
+
+```kotlin
+// Request settings list from cloud
+val configs = ClientApi.requestSettingsList()
+
+// Download specific configuration
+val scriptReader = ClientApi.requestSettingsScript(settingId)
+```
+
+<Info>
+  Cloud configs are fetched from the official LiquidBounce API and are regularly updated by the community.
+</Info>
+
+## Loading States
+
+The system tracks loading state to prevent conflicts (`AutoConfig.kt:63`):
+
+```kotlin
+@Volatile
+var loadingNow = false
+    set(value) {
+        field = value
+        // After completion of loading, sync ClickGUI
+        if (!value) {
+            ModuleClickGui.sync()
+        }
+    }
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Test Configurations" icon="flask">
+    Always test auto-configs in a safe environment before using on important servers
+  </Card>
+  
+  <Card title="Protocol Matching" icon="network-wired">
+    Ensure the config protocol matches your target server's version
+  </Card>
+  
+  <Card title="Metadata Accuracy" icon="info-circle">
+    Provide accurate metadata when creating configs to help other users
+  </Card>
+  
+  <Card title="Regular Updates" icon="arrows-rotate">
+    Reload configs regularly to get the latest server-specific settings
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+The system includes comprehensive error handling:
+
+```kotlin
+try {
+    configs = ClientApi.requestSettingsList()
+    true
+} catch (e: Exception) {
+    logger.error("Failed to load auto configs", e)
+    false
+}
+```
+
+<Tip>
+  Always check the return value of `reloadConfigs()` to ensure successful loading.
+</Tip>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Configuration System" icon="gear" href="/api/config-system">
+    Learn about the underlying configuration system
+  </Card>
+  
+  <Card title="Module System" icon="puzzle-piece" href="/concepts/modules">
+    Understand how modules are configured
+  </Card>
+</CardGroup>

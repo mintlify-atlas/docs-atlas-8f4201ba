@@ -1,0 +1,353 @@
+---
+title: Marketplace
+description: Browse, install, and manage scripts, themes, and configs from the LiquidBounce Marketplace
+icon: store
+---
+
+# Marketplace
+
+The LiquidBounce Marketplace allows users to subscribe to and install community-created content including scripts, themes, and configurations. The `MarketplaceManager` handles all marketplace operations.
+
+## Overview
+
+The Marketplace system provides:
+
+<CardGroup cols={2}>
+  <Card title="Script Library" icon="code">
+    Download and install custom scripts to extend functionality
+  </Card>
+  <Card title="Theme Collection" icon="palette">
+    Install custom themes to personalize your UI
+  </Card>
+  <Card title="Auto Updates" icon="arrows-rotate">
+    Automatically check for and install updates to subscribed items
+  </Card>
+  <Card title="Version Control" icon="timeline">
+    Manage different revisions of installed items
+  </Card>
+</CardGroup>
+
+## Item Types
+
+Marketplace items are categorized by type in `MarketplaceItemType`:
+
+```kotlin
+enum class MarketplaceItemType(
+    override val tag: String,
+    val isListable: Boolean,      // Can be browsed in marketplace
+    val isSubscribable: Boolean    // Can be subscribed/installed
+) : Tagged {
+    CONFIG("Config", false, false),
+    SCRIPT("Script", true, true),
+    THEME("Theme", true, true),
+    OTHER("Other", false, false)
+}
+```
+
+<Info>
+Only **Script** and **Theme** types are currently subscribable and can be installed through the marketplace.
+</Info>
+
+## Subscribing to Items
+
+Subscribe to a marketplace item:
+
+```kotlin
+suspend fun subscribeToItem(item: MarketplaceItem) {
+    MarketplaceManager.subscribe(item)
+}
+```
+
+The subscription process:
+1. Checks if already subscribed via `isSubscribed(item.id)`
+2. Creates a `SubscribedItem` wrapper
+3. Adds to `subscribedItems` list
+4. Installs the newest revision
+5. Stores configuration
+
+## Subscribed Items
+
+Subscribed items are tracked with metadata:
+
+```kotlin
+data class SubscribedItem(
+    val name: String,
+    val id: Int,
+    val type: MarketplaceItemType,
+    var installedRevisionId: Int?
+)
+```
+
+### Storage Structure
+
+Items are stored in the marketplace directory:
+
+```
+.liquidbounce/
+└── marketplace/
+    └── items/
+        └── {item_id}/
+            └── {revision_id}/
+                └── [extracted files]
+```
+
+The installation folder is determined dynamically:
+
+```kotlin
+fun getInstallationFolder(): File? {
+    val revisionDir = itemDir.resolve(installedRevisionId.toString())
+    
+    // Returns the folder containing files
+    // Could be revision root or a subdirectory like /dist
+    return findFolderWithFiles(revisionDir)
+}
+```
+
+## Installing and Updating
+
+### Install Process
+
+```kotlin
+suspend fun install(revisionId: Int, subTask: ResourceTask? = null) {
+    // Download revision archive
+    val revisionUrl = MarketplaceApi.downloadRevision(id, revisionId)
+    download(revisionUrl, revisionArchiveFile, progressListener)
+    
+    // Extract to revision directory
+    extractZip(revisionArchiveFile, revisionDir)
+    
+    // Update installed revision ID
+    installedRevisionId = revisionId
+    ConfigSystem.store(MarketplaceManager)
+    
+    // Clean up old revision
+    previousRevisionDir?.deleteRecursively()
+    
+    // Reload the item type's manager
+    type.reload()
+}
+```
+
+<Note>
+The installation process includes cleanup of previous revisions to save disk space.
+</Note>
+
+### Update Items
+
+Update all subscribed items:
+
+```kotlin
+suspend fun updateAll(task: Task? = null, command: Command? = null) {
+    subscribedItems.toList().forEach { item ->
+        update(item, task, command)
+    }
+}
+```
+
+Update a specific item:
+
+```kotlin
+suspend fun update(item: SubscribedItem) {
+    // Check if update is available
+    val updateRevisionId = item.checkUpdate() ?: return
+    
+    // Install the new revision
+    item.install(updateRevisionId)
+}
+```
+
+### Check for Updates
+
+```kotlin
+suspend fun checkUpdate(): Int? {
+    val newestRevisionId = getNewestRevisionId()
+    
+    if (installedRevisionId == newestRevisionId) {
+        return null  // Already up to date
+    }
+    
+    return newestRevisionId
+}
+```
+
+The newest revision is fetched from the API:
+
+```kotlin
+suspend fun getNewestRevisionId(): Int? {
+    val item = MarketplaceApi.getMarketplaceItem(id)
+    
+    // Only update if item is still active
+    if (item.status != MarketplaceItemStatus.ACTIVE) {
+        return null
+    }
+    
+    // Get first (newest) revision
+    val revisions = MarketplaceApi.getMarketplaceItemRevisions(id, 1, 1)
+    return revisions.items.firstOrNull()?.id
+}
+```
+
+## Unsubscribing
+
+Remove a subscribed item:
+
+```kotlin
+suspend fun unsubscribe(itemId: Int) {
+    val item = subscribedItems.find { it.id == itemId }
+        ?: error("Item $itemId not found")
+    
+    // Delete all item files
+    check(item.itemDir.deleteRecursively()) {
+        "Failed to delete item directory"
+    }
+    
+    // Remove from subscriptions
+    subscribedItems.remove(item)
+    ConfigSystem.store(this)
+    
+    // Reload the item type's manager
+    item.type.reload()
+}
+```
+
+<Warning>
+Unsubscribing permanently deletes all downloaded files for that item.
+</Warning>
+
+## Querying Subscriptions
+
+Get subscribed items by type:
+
+```kotlin
+val scripts = MarketplaceManager.getSubscribedItemsOfType(
+    MarketplaceItemType.SCRIPT
+)
+
+val themes = MarketplaceManager.getSubscribedItemsOfType(
+    MarketplaceItemType.THEME
+)
+```
+
+Check subscription status:
+
+```kotlin
+if (MarketplaceManager.isSubscribed(itemId)) {
+    // Already subscribed
+}
+```
+
+Get specific item:
+
+```kotlin
+val item = MarketplaceManager.getItem(itemId)
+```
+
+## Progress Tracking
+
+Download progress can be tracked using `ResourceTask`:
+
+```kotlin
+val progressListener = OkHttpProgressInterceptor.ProgressListener { 
+    bytesRead, contentLength, done ->
+    subTask.update(bytesRead, contentLength)
+}
+
+download(url, file, progressListener = progressListener)
+```
+
+## Type-Specific Reloading
+
+When items are installed, updated, or removed, their managers are reloaded:
+
+```kotlin
+suspend fun reload() = when (this) {
+    THEME -> ThemeManager.load()
+    SCRIPT -> ScriptManager.reload()
+    else -> { }
+}
+```
+
+This ensures:
+- New scripts are compiled and loaded
+- New themes are recognized and available
+- Removed items are unloaded from memory
+
+## Marketplace Commands
+
+The marketplace can be controlled via commands:
+
+<CodeGroup>
+```kotlin Subscribe
+// Subscribe to an item
+MarketplaceSubscribeCommand.execute(itemId)
+```
+
+```kotlin Unsubscribe
+// Unsubscribe from an item
+MarketplaceUnsubscribeCommand.execute(itemId)
+```
+
+```kotlin Update
+// Update all subscribed items
+MarketplaceUpdateCommand.execute()
+```
+
+```kotlin Search
+// Search marketplace
+MarketplaceSearchCommand.execute(query)
+```
+</CodeGroup>
+
+## Error Handling
+
+The marketplace system uses `runCatching` for robust error handling:
+
+```kotlin
+runCatching {
+    item.install(updateRevisionId, subTask)
+}.onFailure { e ->
+    logger.error("Failed to update item ${item.id}", e)
+    command?.chat(markAsError(
+        translation("liquidbounce.command.marketplace.error.updateFailed",
+            item.id, e.message ?: "Unknown error")
+    ))
+}
+```
+
+## Code References
+
+<CardGroup cols={2}>
+  <Card title="MarketplaceManager.kt" icon="file-code">
+    Core marketplace logic - line 42
+    <br/>`features/marketplace/MarketplaceManager.kt`
+  </Card>
+  <Card title="SubscribedItem.kt" icon="box">
+    Subscribed item handling - line 36
+    <br/>`features/marketplace/SubscribedItem.kt`
+  </Card>
+  <Card title="MarketplaceItemType.kt" icon="list">
+    Item type definitions - line 26
+    <br/>`api/models/marketplace/MarketplaceItemType.kt`
+  </Card>
+  <Card title="Marketplace Commands" icon="terminal">
+    Command implementations
+    <br/>`features/command/commands/client/marketplace/`
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Check Before Subscribe">
+    Always verify an item isn't already subscribed before subscribing
+  </Step>
+  <Step title="Handle Updates Gracefully">
+    Use update tasks to provide progress feedback to users
+  </Step>
+  <Step title="Verify Installation">
+    Check `getInstallationFolder()` returns a valid path before using installed items
+  </Step>
+  <Step title="Clean Up">
+    Old revisions are automatically deleted, but ensure proper error handling
+  </Step>
+</Steps>

@@ -1,0 +1,242 @@
+---
+title: Getting Started with Scripts
+description: Learn how to create and use scripts in LiquidBounce
+icon: rocket
+---
+
+## Introduction
+
+LiquidBounce features a powerful scripting system that allows you to extend the client with custom modules, commands, and functionality at runtime. Scripts can be written in various languages supported by GraalVM's polyglot engine.
+
+## Supported Languages
+
+LiquidBounce uses **GraalVM's polyglot engine** to support multiple scripting languages:
+
+- **JavaScript** (ES2023) - Primary supported language with Nashorn compatibility
+- **Python** (via GraalPy)
+- **Ruby** (via TruffleRuby)
+- Other GraalVM-supported languages
+
+<Note>
+JavaScript is the recommended language for LiquidBounce scripts, with the most examples and community support.
+</Note>
+
+## Script Location
+
+Scripts are stored in the `scripts` directory within your LiquidBounce folder:
+
+```
+LiquidBounce/
+└── scripts/
+    ├── MyScript.js
+    ├── AnotherScript.js
+    └── MyModule/
+        └── main.js
+```
+
+### Script Organization
+
+You can organize scripts in two ways:
+
+<AccordionGroup>
+  <Accordion title="Single File Script">
+    Place your script file directly in the `scripts` directory:
+    ```
+    scripts/MyScript.js
+    ```
+  </Accordion>
+
+  <Accordion title="Directory-Based Script">
+    Create a directory and place a `main` file inside:
+    ```
+    scripts/MyModule/main.js
+    ```
+    
+    This allows you to:
+    - Use CommonJS `require()` to import other files
+    - Organize complex scripts with multiple files
+    - Bundle resources with your script
+  </Accordion>
+</AccordionGroup>
+
+## Basic Script Structure
+
+Every LiquidBounce script must register itself using the `registerScript` function:
+
+```javascript
+var script = registerScript({
+    name: "MyScript",
+    version: "1.0.0",
+    authors: ["YourName"]
+});
+```
+
+### Required Properties
+
+<ParamField path="name" type="string" required>
+  The display name of your script
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  Semantic version of your script (e.g., "1.0.0")
+</ParamField>
+
+<ParamField path="authors" type="string | string[]" required>
+  Script author(s) - can be a single string or an array
+</ParamField>
+
+## Script Lifecycle Events
+
+Scripts can hook into lifecycle events using the `script.on()` method:
+
+```javascript
+var script = registerScript({
+    name: "MyScript",
+    version: "1.0.0",
+    authors: ["YourName"]
+});
+
+// Called when the script is loaded
+script.on("load", function() {
+    Client.displayChatMessage("§aScript loaded!");
+});
+
+// Called when the script is enabled
+script.on("enable", function() {
+    Client.displayChatMessage("§aScript enabled!");
+});
+
+// Called when the script is disabled
+script.on("disable", function() {
+    Client.displayChatMessage("§cScript disabled!");
+});
+```
+
+### Available Lifecycle Events
+
+<ResponseField name="load" type="event">
+  Triggered when the script is first loaded from disk
+</ResponseField>
+
+<ResponseField name="enable" type="event">
+  Triggered when the script is enabled (modules/commands registered)
+</ResponseField>
+
+<ResponseField name="disable" type="event">
+  Triggered when the script is disabled (modules/commands unregistered)
+</ResponseField>
+
+## Complete Example
+
+Here's a complete minimal script:
+
+```javascript
+var script = registerScript({
+    name: "ExampleScript",
+    version: "1.0.0",
+    authors: ["Developer"]
+});
+
+script.on("load", function() {
+    Client.displayChatMessage("§7[§bExampleScript§7] §aLoaded successfully!");
+});
+
+script.on("enable", function() {
+    Client.displayChatMessage("§7[§bExampleScript§7] §aEnabled!");
+});
+
+script.on("disable", function() {
+    Client.displayChatMessage("§7[§bExampleScript§7] §cDisabled!");
+});
+```
+
+## Loading Scripts
+
+<Steps>
+  <Step title="Place Script File">
+    Copy your script file (e.g., `MyScript.js`) into the `scripts` directory
+  </Step>
+  
+  <Step title="Reload Scripts">
+    Use the `.reload` command in-game or restart LiquidBounce:
+    ```
+    .reload
+    ```
+  </Step>
+  
+  <Step title="Verify Loading">
+    Check the console or chat for confirmation messages
+  </Step>
+</Steps>
+
+<Check>
+Scripts are automatically loaded on client startup!
+</Check>
+
+## CommonJS Support
+
+For JavaScript scripts, CommonJS module loading is enabled:
+
+```javascript
+// lib/helper.js
+module.exports = {
+    greet: function(name) {
+        return "Hello, " + name + "!";
+    }
+};
+
+// main.js
+var helper = require("./lib/helper");
+
+var script = registerScript({
+    name: "ModuleExample",
+    version: "1.0.0",
+    authors: ["Developer"]
+});
+
+script.on("load", function() {
+    Client.displayChatMessage(helper.greet("LiquidBounce"));
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Creating Modules" icon="cube" href="/scripting/creating-modules">
+    Learn how to create custom modules with scripts
+  </Card>
+  
+  <Card title="Creating Commands" icon="terminal" href="/scripting/creating-commands">
+    Build custom commands for the command system
+  </Card>
+  
+  <Card title="Working with Events" icon="bolt" href="/scripting/events">
+    Handle game events in your scripts
+  </Card>
+  
+  <Card title="API Reference" icon="book" href="/scripting/api-reference">
+    Explore the complete Script API
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Script not loading">
+    - Verify the script file is in the correct directory
+    - Check that `registerScript()` is called with all required fields
+    - Look for errors in the console log
+    - Ensure the file extension matches a supported language (`.js`, `.py`, etc.)
+  </Accordion>
+
+  <Accordion title="Syntax errors">
+    - Check your JavaScript syntax
+    - For JavaScript, ECMAScript 2023 features are supported
+    - Use Nashorn-compatible syntax if needed
+  </Accordion>
+
+  <Accordion title="Missing features">
+    - Ensure you're using the correct API methods (see API Reference)
+    - Check that the client version supports the feature you're trying to use
+  </Accordion>
+</AccordionGroup>

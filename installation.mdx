@@ -1,0 +1,301 @@
+---
+title: "Installation"
+description: "Set up your development environment and build LiquidBounce from source"
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+<CardGroup cols={2}>
+  <Card title="Gradle" icon="code">
+    Build automation tool for compiling LiquidBounce
+  </Card>
+  <Card title="Node.js" icon="node-js">
+    Required for building the client's custom theme system
+  </Card>
+  <Card title="Git" icon="git-alt">
+    Version control for cloning the repository with submodules
+  </Card>
+  <Card title="JDK 21+" icon="java">
+    Java Development Kit for running and building the project
+  </Card>
+</CardGroup>
+
+### Check Gradle Installation
+
+Gradle is essential for building LiquidBounce. Verify your installation:
+
+```bash
+gradle --version
+```
+
+If Gradle is not installed, follow the [official Gradle installation guide](https://gradle.org/install/).
+
+<Note>
+  LiquidBounce uses Gradle wrapper (`gradlew`), so you can use the included wrapper script even without a system-wide Gradle installation.
+</Note>
+
+### Check Node.js Installation
+
+Node.js is required for building the theme system. Verify your installation:
+
+```bash
+node --version
+npm --version
+```
+
+If Node.js is not installed, download it from [nodejs.org](https://nodejs.org).
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the LiquidBounce repository with all submodules:
+
+    ```bash
+    git clone --recurse-submodules https://github.com/CCBlueX/LiquidBounce
+    ```
+
+    <Warning>
+      The `--recurse-submodules` flag is **required** to properly clone all dependencies. Without it, the build will fail.
+    </Warning>
+  </Step>
+
+  <Step title="Navigate to the Directory">
+    Change into the LiquidBounce directory:
+
+    ```bash
+    cd LiquidBounce
+    ```
+  </Step>
+
+  <Step title="Generate Sources (Optional)">
+    Generate decompiled Minecraft sources for better IDE support:
+
+    ```bash
+    ./gradlew genSources
+    ```
+
+    <Note>
+      This step is optional but **highly recommended** for development. It provides better code completion and allows you to browse Minecraft's source code in your IDE.
+    </Note>
+
+    On Windows, use:
+
+    ```bash
+    gradlew.bat genSources
+    ```
+  </Step>
+
+  <Step title="Open in Your IDE">
+    Open the project folder as a Gradle project in your preferred IDE:
+
+    **IntelliJ IDEA** (Recommended):
+    - File → Open → Select the `LiquidBounce` folder
+    - IntelliJ will automatically detect it as a Gradle project
+    - Wait for Gradle to sync and index the project
+
+    **Eclipse**:
+    - File → Import → Gradle → Existing Gradle Project
+    - Select the `LiquidBounce` folder
+
+    **VS Code**:
+    - Open the folder in VS Code
+    - Install the "Gradle for Java" extension
+    - Let the extension configure the project
+  </Step>
+
+  <Step title="Run the Client">
+    Launch LiquidBounce using Gradle:
+
+    ```bash
+    ./gradlew runClient
+    ```
+
+    On Windows:
+
+    ```bash
+    gradlew.bat runClient
+    ```
+
+    <Note>
+      The first run will take some time as Gradle downloads all dependencies and builds the theme system.
+    </Note>
+  </Step>
+</Steps>
+
+## Build Configuration
+
+LiquidBounce's build is configured through several files:
+
+### build.gradle.kts
+
+The main build script written in Kotlin DSL. Key configurations:
+
+- **Minecraft Version**: Defined in `gradle/libs.versions.toml`
+- **Fabric Loader**: Mod loading framework
+- **Fabric API**: Core API for Fabric mods
+- **Fabric Kotlin**: Kotlin language support for Fabric
+
+### gradle.properties
+
+Project properties and metadata:
+
+```properties
+mod_version=0.36.1
+maven_group=net.ccbluex
+archives_base_name=liquidbounce
+```
+
+## Theme System
+
+LiquidBounce includes a custom theme built with Node.js:
+
+### Theme Build Process
+
+The theme is automatically built during compilation:
+
+1. **npmInstallTheme**: Installs Node.js dependencies
+2. **buildTheme**: Builds the theme using Rollup
+3. **bundleTheme**: Packages the theme into a ZIP file
+
+The built theme is located at:
+```
+src-theme/resources/assets/liquidbounce/themes/liquidbounce.zip
+```
+
+<Note>
+  The theme build is automatically triggered by the `processResources` task, so you don't need to build it manually.
+</Note>
+
+## Building the JAR
+
+To build a distributable JAR file:
+
+```bash
+./gradlew build
+```
+
+The built JAR will be located in:
+```
+build/libs/liquidbounce-0.36.1.jar
+```
+
+<CodeGroup>
+```bash Linux/macOS
+./gradlew build
+```
+
+```bash Windows
+gradlew.bat build
+```
+</CodeGroup>
+
+## First Launch
+
+<Steps>
+  <Step title="Launch Minecraft">
+    After running `./gradlew runClient`, Minecraft will start with LiquidBounce installed.
+  </Step>
+
+  <Step title="Verify Installation">
+    Look for the LiquidBounce logo and branding in the main menu. You should see:
+    - Modified main menu (if theme is loaded)
+    - LiquidBounce version in the corner
+    - Access to the ClickGUI (press Right Shift)
+  </Step>
+
+  <Step title="Check the Console">
+    Monitor the console output for any errors. A successful launch shows:
+    ```
+    [LiquidBounce] Loading LiquidBounce...
+    [LiquidBounce] Loaded X modules
+    [LiquidBounce] Loaded X commands
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Build fails with 'submodules not found'">
+    You forgot to clone with `--recurse-submodules`. Fix it by running:
+    ```bash
+    git submodule update --init --recursive
+    ```
+  </Accordion>
+
+  <Accordion title="Theme build errors">
+    Ensure Node.js and npm are properly installed:
+    ```bash
+    node --version
+    npm --version
+    ```
+    Then clean and rebuild:
+    ```bash
+    ./gradlew clean build
+    ```
+  </Accordion>
+
+  <Accordion title="Out of memory errors">
+    Increase Gradle's memory allocation in `gradle.properties`:
+    ```properties
+    org.gradle.jvmargs=-Xms1024m -Xmx4096m -XX:+UseZGC -XX:+ZGenerational
+    ```
+  </Accordion>
+
+  <Accordion title="IDE doesn't recognize Kotlin files">
+    Make sure the Kotlin plugin is installed in your IDE. For IntelliJ IDEA:
+    - File → Settings → Plugins
+    - Search for "Kotlin" and install it
+    - Restart the IDE
+  </Accordion>
+</AccordionGroup>
+
+## Development Tools
+
+### Code Quality
+
+LiquidBounce uses Detekt for code quality:
+
+```bash
+./gradlew detekt
+```
+
+### Testing
+
+Run the test suite:
+
+```bash
+./gradlew test
+```
+
+### Documentation
+
+Generate Dokka documentation:
+
+```bash
+./gradlew dokkaHtml
+```
+
+## Next Steps
+
+Now that you have LiquidBounce installed, learn how to use it:
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Learn the basics and enable your first module
+  </Card>
+  <Card
+    title="Contributing"
+    icon="code-pull-request"
+    href="https://github.com/CCBlueX/LiquidBounce/blob/nextgen/CONTRIBUTING.md"
+  >
+    Contribute to LiquidBounce development
+  </Card>
+</CardGroup>

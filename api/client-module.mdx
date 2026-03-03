@@ -1,0 +1,291 @@
+---
+title: "ClientModule"
+description: "Base class for all LiquidBounce modules with configuration, event handling, and lifecycle management"
+---
+
+## Overview
+
+The `ClientModule` class is the foundation for all modules (hacks) in LiquidBounce. It extends `ToggleableValueGroup` and implements `EventListener`, providing a complete framework for creating toggleable features with configuration and event handling.
+
+**Package:** `net.ccbluex.liquidbounce.features.module`
+
+## Class Declaration
+
+```kotlin
+open class ClientModule(
+    name: String,
+    val category: ModuleCategory,
+    bind: Int = InputConstants.UNKNOWN.value,
+    bindAction: InputBind.BindAction = InputBind.BindAction.TOGGLE,
+    state: Boolean = false,
+    val notActivatable: Boolean = false,
+    val disableActivation: Boolean = notActivatable,
+    val disableOnQuit: Boolean = false,
+    aliases: List<String> = emptyList(),
+    hide: Boolean = false
+) : ToggleableValueGroup(null, name, state, aliases = aliases), EventListener
+```
+
+## Constructor Parameters
+
+<ParamField path="name" type="String" required>
+  Module name displayed in UI and commands
+</ParamField>
+
+<ParamField path="category" type="ModuleCategory" required>
+  Module category (Combat, Movement, Player, Render, World, Exploit, Misc, Fun)
+</ParamField>
+
+<ParamField path="bind" type="Int" default="InputConstants.UNKNOWN.value">
+  Default keybind (use GLFW key constants)
+</ParamField>
+
+<ParamField path="bindAction" type="InputBind.BindAction" default="TOGGLE">
+  Binding behavior: TOGGLE, HOLD, or SMART
+</ParamField>
+
+<ParamField path="state" type="Boolean" default="false">
+  Default enabled state
+</ParamField>
+
+<ParamField path="notActivatable" type="Boolean" default="false">
+  If true, module cannot be toggled by user (utility modules)
+</ParamField>
+
+<ParamField path="disableActivation" type="Boolean" default="notActivatable">
+  Prevents module from being enabled
+</ParamField>
+
+<ParamField path="disableOnQuit" type="Boolean" default="false">
+  Auto-disables module when leaving server
+</ParamField>
+
+<ParamField path="aliases" type="List<String>" default="emptyList()">
+  Alternative names for the module
+</ParamField>
+
+<ParamField path="hide" type="Boolean" default="false">
+  Default hidden state (hides from ArrayList)
+</ParamField>
+
+## Properties
+
+<ParamField path="running" type="Boolean">
+  Whether the module is actively running (enabled + in-game)
+  
+  ```kotlin
+  override val running: Boolean
+      get() = super<EventListener>.running && inGame && (enabled || notActivatable)
+  ```
+</ParamField>
+
+<ParamField path="bind" type="InputBind">
+  Current keybind configuration
+  
+  ```kotlin
+  val bind: InputBind
+  ```
+</ParamField>
+
+<ParamField path="hidden" type="Boolean">
+  Whether module is hidden from ArrayList
+  
+  ```kotlin
+  var hidden: Boolean
+  ```
+</ParamField>
+
+<ParamField path="tag" type="String?">
+  Optional tag displayed in ArrayList (e.g., mode name)
+  
+  ```kotlin
+  open val tag: String?
+  ```
+</ParamField>
+
+<ParamField path="settings" type="Map<String, Value<*>>">
+  Map of all module settings accessible by name
+  
+  ```kotlin
+  @ScriptApiRequired
+  open val settings: Map<String, Value<*>>
+  ```
+</ParamField>
+
+<ParamField path="baseKey" type="String">
+  Translation key prefix for this module
+  
+  ```kotlin
+  override val baseKey: String = "${ConfigSystem.KEY_PREFIX}.module.${name.toLowerCamelCase()}"
+  ```
+</ParamField>
+
+## Lifecycle Methods
+
+### onRegistration
+
+```kotlin
+open fun onRegistration()
+```
+
+Called when the module is registered in ModuleManager. Override to perform initialization.
+
+### onToggled
+
+```kotlin
+final override fun onToggled(state: Boolean): Boolean
+```
+
+Called when module state changes. Handles notifications and events. Do not override - use `onEnable()`/`onDisable()` instead.
+
+### enabledEffect
+
+```kotlin
+open suspend fun enabledEffect()
+```
+
+Launches an async coroutine task when module is enabled. Useful for repeating tasks.
+
+**Example:**
+```kotlin
+override suspend fun enabledEffect() {
+    while (enabled) {
+        // Repeating task
+        delay(1000)
+    }
+}
+```
+
+### Inherited from ToggleableValueGroup
+
+```kotlin
+open fun onEnable()
+open fun onDisable()
+```
+
+Override these methods to implement module enable/disable logic.
+
+## Methods
+
+### tagBy
+
+```kotlin
+fun tagBy(setting: Value<*>)
+```
+
+Sets a value to be displayed as the module tag.
+
+**Example:**
+```kotlin
+val mode by choices("Mode", arrayOf("Speed", "Damage"), "Speed")
+
+init {
+    tagBy(mode)
+}
+```
+
+### message
+
+```kotlin
+fun message(key: String, vararg args: Any): MutableComponent
+```
+
+Creates a translated message component for this module.
+
+```kotlin
+val msg = message("targetFound", targetName)
+```
+
+### verifyFallbackDescription
+
+```kotlin
+fun verifyFallbackDescription()
+```
+
+Warns if module is missing translation description. Used during development.
+
+## Creating Modules
+
+### Basic Module
+
+```kotlin
+object ModuleExample : ClientModule(
+    name = "Example",
+    category = ModuleCategories.MISC
+) {
+    override fun onEnable() {
+        chat("Module enabled!")
+    }
+    
+    override fun onDisable() {
+        chat("Module disabled!")
+    }
+}
+```
+
+### Module with Settings
+
+```kotlin
+object ModuleFly : ClientModule(
+    name = "Fly",
+    category = ModuleCategories.MOVEMENT
+) {
+    val speed by float("Speed", 1.0f, 0.1f..5.0f)
+    val mode by choices("Mode", arrayOf("Vanilla", "Damage"), "Vanilla")
+    
+    override fun onEnable() {
+        // Use settings
+        player.abilities.mayfly = true
+    }
+}
+```
+
+### Module with Event Handlers
+
+```kotlin
+object ModuleAutoJump : ClientModule(
+    name = "AutoJump",
+    category = ModuleCategories.MOVEMENT
+) {
+    val tickHandler = handler<GameTickEvent> {
+        if (player.onGround) {
+            player.jumpFromGround()
+        }
+    }
+}
+```
+
+### Module with Modes
+
+```kotlin
+object ModuleSpeed : ClientModule(
+    name = "Speed",
+    category = ModuleCategories.MOVEMENT
+) {
+    private val modes = choices("Mode", 
+        SpeedBHop,
+        SpeedStrafe,
+        SpeedYPort
+    )
+    
+    object SpeedBHop : ChoiceConfigurable(this, "BHop") {
+        val speed by float("Speed", 1.0f, 0.1f..3.0f)
+    }
+}
+```
+
+## Best Practices
+
+1. **Use descriptive names** - Module names appear in UI and commands
+2. **Set appropriate category** - Helps users find your module
+3. **Add keybinds for commonly used modules** - Improves UX
+4. **Use `disableOnQuit`** for modules that shouldn't persist across sessions
+5. **Implement `enabledEffect()`** for background tasks instead of tick handlers
+6. **Use `tagBy()`** to show current mode in ArrayList
+
+## See Also
+
+- [ModuleManager](/api/module-manager) - Module registration and management
+- [ModuleCategories](/api/module-categories) - Available categories
+- [EventListener](/api/event-listener) - Event handling system
+- [Value Types](/api/value-types) - Configuration value types

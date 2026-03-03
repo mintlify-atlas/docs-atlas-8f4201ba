@@ -1,0 +1,403 @@
+---
+title: Theme System
+description: Customize LiquidBounce's user interface with Svelte-based themes
+icon: palette
+---
+
+# Theme System
+
+LiquidBounce features a powerful theme system built on **Svelte** and served through an integrated browser backend. Themes control the appearance of menus, HUD, and all UI elements.
+
+## Overview
+
+The theme system provides:
+
+<CardGroup cols={2}>
+  <Card title="Svelte UI" icon="code">
+    Modern reactive UI framework with component-based architecture
+  </Card>
+  <Card title="Multiple Sources" icon="folder">
+    Load themes from resources, local files, or marketplace
+  </Card>
+  <Card title="Custom Backgrounds" icon="image">
+    Support for image backgrounds and GLSL shaders
+  </Card>
+  <Card title="Hot Reload" icon="arrows-rotate">
+    Themes reload on resource manager refresh
+  </Card>
+</CardGroup>
+
+## Theme Manager
+
+The `ThemeManager` (line 47) handles all theme operations:
+
+```kotlin
+object ThemeManager : Config("theme") {
+    internal val themesFolder = File(ConfigSystem.rootFolder, "themes")
+    
+    val themes: List<Theme>
+    val themeIds get() = themes.map { it.metadata.id }
+    
+    private var currentTheme by text("Theme", "liquidbounce")
+    internal var includedTheme: Theme? = null
+    private var temporaryTheme: Theme? = null
+}
+```
+
+## Theme Origins
+
+Themes can come from three sources, loaded in priority order:
+
+<Steps>
+  <Step title="Local Themes">
+    Themes in `.liquidbounce/themes/` directory (highest priority)
+    
+    ```kotlin
+    Theme.load(Theme.Origin.LOCAL, file.relativeTo(themesFolder))
+    ```
+  </Step>
+  
+  <Step title="Marketplace Themes">
+    Themes installed from marketplace
+    
+    ```kotlin
+    MarketplaceManager.getSubscribedItemsOfType(MarketplaceItemType.THEME)
+        .forEach { item ->
+            Theme.load(Theme.Origin.MARKETPLACE, relativeFile)
+        }
+    ```
+  </Step>
+  
+  <Step title="Resource Theme">
+    Built-in "liquidbounce" theme (fallback)
+    
+    ```kotlin
+    includedTheme = Theme.load(Theme.Origin.RESOURCE, File("liquidbounce"))
+    ```
+  </Step>
+</Steps>
+
+<Info>
+If multiple themes have the same ID, only the first (highest priority) is loaded.
+</Info>
+
+## Loading Themes
+
+Themes are loaded during client initialization:
+
+```kotlin
+suspend fun init() {
+    // Load default theme
+    includedTheme = Theme.load(Theme.Origin.RESOURCE, File("liquidbounce"))
+}
+
+suspend fun load() {
+    themes.clear()
+    
+    // Load local themes
+    themesFolder.listFiles { it.isDirectory }?.forEach { file ->
+        Theme.load(Theme.Origin.LOCAL, file.relativeTo(themesFolder))
+            .addIfUnloaded()
+    }
+    
+    // Load marketplace themes
+    MarketplaceManager.getSubscribedItemsOfType(MarketplaceItemType.THEME)
+        .forEach { item ->
+            Theme.load(Theme.Origin.MARKETPLACE, relativeFile)
+                .addIfUnloaded()
+        }
+    
+    // Update UI
+    ModuleHud.updateThemes()
+    ScreenManager.update()
+}
+```
+
+## Theme Selection
+
+The active theme is determined by:
+
+```kotlin
+var theme: Theme?
+    get() = temporaryTheme
+        ?: themes.find { it.metadata.id.equals(currentTheme, true) }
+        ?: includedTheme
+    set(value) {
+        if (value?.origin?.external == true) {
+            temporaryTheme = value  // External theme
+        } else {
+            temporaryTheme = null
+            currentTheme = value.metadata.id
+        }
+    }
+```
+
+<Warning>
+Temporary themes (external) take precedence but aren't persisted to config.
+</Warning>
+
+## Svelte Integration
+
+Themes are built with Svelte and served through the browser backend:
+
+### Theme Structure
+
+```
+theme/
+├── metadata.json       # Theme information
+├── src/
+│   ├── App.svelte      # Root component
+│   ├── routes/         # Route components
+│   │   ├── menu/
+│   │   │   ├── title/Title.svelte
+│   │   │   ├── multiplayer/Multiplayer.svelte
+│   │   │   └── altmanager/AltManager.svelte
+│   │   └── hud/
+│   ├── integration/    # LiquidBounce integration
+│   │   ├── ws.ts       # WebSocket communication
+│   │   ├── rest.ts     # REST API
+│   │   └── events.ts   # Event handling
+│   └── theme/
+│       └── theme_config.ts
+└── public/
+    └── img/            # Theme assets
+```
+
+### Theme Configuration
+
+Themes define their configuration in TypeScript:
+
+```typescript
+// theme_config.ts
+export let spaceSeperatedNames = writable(false);
+
+export function convertToSpacedString(name: string): string {
+    const regex = /[A-Z]?[a-z]+|[0-9]+|[A-Z]+(?![a-z])/g;
+    return (name.match(regex) as string[]).join(" ");
+}
+```
+
+## Browser Integration
+
+Themes are rendered in an embedded browser:
+
+### Opening a Theme Screen
+
+```kotlin
+fun openImmediate(
+    customScreenType: CustomScreenType? = null,
+    markAsStatic: Boolean = false,
+    settings: BrowserSettings
+): Browser {
+    val backend = BrowserBackendManager.backend
+        ?: error("Browser backend is not initialized.")
+    
+    return backend.createBrowser(
+        getScreenLocation(customScreenType, markAsStatic).url,
+        settings = settings
+    )
+}
+```
+
+### Input-Aware Screens
+
+For interactive screens (menus, click GUI):
+
+```kotlin
+fun openInputAwareImmediate(
+    customScreenType: CustomScreenType? = null,
+    markAsStatic: Boolean = false,
+    settings: BrowserSettings,
+    priority: Short = 10,
+    inputAcceptor: InputAcceptor = takesInputHandler
+): Browser
+```
+
+<Info>
+Input-aware screens run at higher refresh rates for smooth interaction.
+</Info>
+
+## Screen Routes
+
+Themes define routes for different screens:
+
+```kotlin
+fun getScreenLocation(
+    customScreenType: CustomScreenType? = null,
+    markAsStatic: Boolean = false
+): ScreenLocation {
+    val theme = theme.takeIf { theme ->
+        customScreenType == null || 
+        theme?.isSupported(customScreenType.routeName) == true
+    } ?: includedTheme
+    
+    return ScreenLocation(
+        theme,
+        theme.getUrl(customScreenType?.routeName, markAsStatic)
+    )
+}
+```
+
+Common routes include:
+- `title` - Main menu
+- `multiplayer` - Server list
+- `altmanager` - Account manager
+- `hud` - In-game HUD
+- `clickgui` - Click GUI
+
+## Backgrounds
+
+Themes can provide custom backgrounds:
+
+### Background Images
+
+```kotlin
+fun loadBackgroundAsync(): CompletableFuture<Unit> = renderScope.future {
+    theme?.loadBackgroundImage()
+}
+```
+
+### Shader Backgrounds
+
+Themes can include GLSL shaders:
+
+```kotlin
+var shaderEnabled by boolean("Shader", false)
+    .onChange { enabled ->
+        if (enabled) {
+            renderScope.launch {
+                theme?.compileShader()
+                includedTheme?.compileShader()
+            }
+        }
+        return@onChange enabled
+    }
+```
+
+Rendering backgrounds:
+
+```kotlin
+fun drawBackground(
+    context: GuiGraphics,
+    width: Int, height: Int,
+    mouseX: Int, mouseY: Int,
+    delta: Float
+): Boolean {
+    val background = if (shaderEnabled) {
+        theme?.backgroundShader
+    } else {
+        theme?.backgroundImage
+    } ?: return false
+    
+    background.draw(context, width, height, mouseX, mouseY, delta)
+    return true
+}
+```
+
+## Resource Reloading
+
+Themes support hot-reloading:
+
+```kotlin
+internal val reloader = ResourceManagerReloadListener { resourceManager ->
+    themes.forEach { it.onResourceManagerReload(resourceManager) }
+    logger.info("Reloaded ${themes.size} themes.")
+}
+```
+
+This is triggered when:
+- Resource packs are reloaded
+- F3+T is pressed
+- Themes are modified during development
+
+## Theme Metadata
+
+Each theme includes a `metadata.json` file:
+
+```json
+{
+  "id": "liquidbounce",
+  "name": "LiquidBounce Default",
+  "version": "1.0.0",
+  "author": "CCBlueX",
+  "description": "Default LiquidBounce theme",
+  "routes": [
+    "title",
+    "multiplayer",
+    "altmanager",
+    "hud",
+    "clickgui"
+  ]
+}
+```
+
+## Creating Custom Themes
+
+To create a custom theme:
+
+<Steps>
+  <Step title="Set Up Structure">
+    Create a directory in `.liquidbounce/themes/` with the required structure
+  </Step>
+  
+  <Step title="Define Metadata">
+    Create `metadata.json` with theme information and supported routes
+  </Step>
+  
+  <Step title="Build UI">
+    Create Svelte components for each route
+  </Step>
+  
+  <Step title="Integrate with LiquidBounce">
+    Use the integration modules (ws.ts, rest.ts, events.ts) to communicate with the client
+  </Step>
+  
+  <Step title="Test and Load">
+    Reload themes via resource reload or restart the client
+  </Step>
+</Steps>
+
+## Code References
+
+<CardGroup cols={2}>
+  <Card title="ThemeManager.kt" icon="gear">
+    Theme management - line 47
+    <br/>`integration/theme/ThemeManager.kt`
+  </Card>
+  <Card title="src-theme/" icon="folder">
+    Default theme source code
+    <br/>`src-theme/src/`
+  </Card>
+  <Card title="integration/" icon="plug">
+    Svelte integration modules
+    <br/>`src-theme/src/integration/`
+  </Card>
+  <Card title="theme_config.ts" icon="file-code">
+    Theme configuration
+    <br/>`src-theme/src/theme/theme_config.ts`
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Support Core Routes">
+    Ensure your theme supports at least title, multiplayer, and hud routes
+  </Step>
+  
+  <Step title="Use Integration APIs">
+    Leverage the provided WebSocket and REST APIs for client communication
+  </Step>
+  
+  <Step title="Optimize Assets">
+    Keep theme assets small for faster loading
+  </Step>
+  
+  <Step title="Test Hot Reload">
+    Verify your theme reloads correctly with F3+T
+  </Step>
+  
+  <Step title="Handle Fallbacks">
+    Gracefully handle missing data from the client
+  </Step>
+</Steps>

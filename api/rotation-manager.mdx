@@ -1,0 +1,341 @@
+---
+title: "RotationManager"
+description: "Manages player rotations for aim assistance and movement correction"
+---
+
+## Overview
+
+The `RotationManager` handles all rotation-related functionality in LiquidBounce, including smooth rotation transitions, server-side rotation tracking, and movement correction.
+
+**Package:** `net.ccbluex.liquidbounce.utils.aiming`
+
+## Object Declaration
+
+```kotlin
+object RotationManager : EventListener
+```
+
+## Properties
+
+<ParamField path="currentRotation" type="Rotation?">
+  The rotation we want to aim at (client-side, not yet confirmed by server).
+  
+  ```kotlin
+  var currentRotation: Rotation?
+  ```
+</ParamField>
+
+<ParamField path="previousRotation" type="Rotation?">
+  Previous rotation for interpolation.
+  
+  ```kotlin
+  var previousRotation: Rotation?
+  ```
+</ParamField>
+
+<ParamField path="serverRotation" type="Rotation">
+  Rotation confirmed by the server (accounting for fake lag/freeze).
+  
+  ```kotlin
+  val serverRotation: Rotation
+  ```
+</ParamField>
+
+<ParamField path="actualServerRotation" type="Rotation">
+  The actual rotation sent to and acknowledged by the server.
+  
+  ```kotlin
+  var actualServerRotation: Rotation
+      private set
+  ```
+</ParamField>
+
+<ParamField path="activeRotationTarget" type="RotationTarget?">
+  Currently active rotation target or previous target if transitioning.
+  
+  ```kotlin
+  val activeRotationTarget: RotationTarget?
+  ```
+</ParamField>
+
+## Core Methods
+
+### setRotationTarget
+
+```kotlin
+fun setRotationTarget(
+    rotation: Rotation,
+    considerInventory: Boolean = true,
+    valueGroup: RotationsValueGroup,
+    priority: Priority,
+    provider: ClientModule,
+    whenReached: RestrictedSingleUseAction? = null
+)
+```
+
+Sets a rotation target with full configuration.
+
+<ParamField path="rotation" type="Rotation" required>
+  Target rotation (yaw, pitch)
+</ParamField>
+
+<ParamField path="considerInventory" type="Boolean" default="true">
+  If true, rotation updates are blocked when inventory is open
+</ParamField>
+
+<ParamField path="valueGroup" type="RotationsValueGroup" required>
+  Rotation configuration (speed, smoothing, etc.)
+</ParamField>
+
+<ParamField path="priority" type="Priority" required>
+  Priority for rotation conflicts
+</ParamField>
+
+<ParamField path="provider" type="ClientModule" required>
+  Module requesting the rotation
+</ParamField>
+
+<ParamField path="whenReached" type="RestrictedSingleUseAction?" default="null">
+  Callback when rotation is reached
+</ParamField>
+
+**Example:**
+```kotlin
+RotationManager.setRotationTarget(
+    rotation = Rotation(player.yRot + 45f, player.xRot),
+    considerInventory = true,
+    valueGroup = rotationsConfigurable,
+    priority = Priority.IMPORTANT,
+    provider = this,
+    whenReached = {
+        // Rotation reached, attack entity
+        mc.gameMode?.attack(player, target)
+    }
+)
+```
+
+### setRotationTarget (RotationTarget)
+
+```kotlin
+fun setRotationTarget(
+    plan: RotationTarget,
+    priority: Priority,
+    provider: ClientModule
+)
+```
+
+Sets a pre-configured rotation target.
+
+### isRotatingAllowed
+
+```kotlin
+fun isRotatingAllowed(rotationTarget: RotationTarget): Boolean
+```
+
+Checks if rotation updates are currently allowed.
+
+### update
+
+```kotlin
+fun update()
+```
+
+Updates rotation to next step. Called automatically every tick.
+
+### rotationMatchesPreviousRotation
+
+```kotlin
+fun rotationMatchesPreviousRotation(): Boolean
+```
+
+Checks if current rotation matches previous rotation.
+
+## Rotation Class
+
+```kotlin
+data class Rotation(
+    val yaw: Float,
+    val pitch: Float,
+    val isNormalized: Boolean = false
+)
+```
+
+<ParamField path="yaw" type="Float">
+  Horizontal rotation (-180 to 180 degrees)
+</ParamField>
+
+<ParamField path="pitch" type="Float">
+  Vertical rotation (-90 to 90 degrees)
+</ParamField>
+
+### Rotation Methods
+
+```kotlin
+fun normalize(): Rotation
+fun angleTo(other: Rotation): Float
+```
+
+## RotationsValueGroup
+
+Configuration for rotation behavior:
+
+```kotlin
+class RotationsValueGroup(...) {
+    val rotationSpeed by float("Speed", 180f, 0f..180f)
+    val smoothMode by enumChoice("SmoothMode", ...)
+    val resetThreshold by float("ResetThreshold", 2f, 0f..180f)
+}
+```
+
+## Movement Correction
+
+RotationManager automatically corrects movement when rotating:
+
+```kotlin
+enum class MovementCorrection {
+    OFF,          // No correction
+    CHANGE_LOOK,  // Change camera look
+    SILENT        // Silent correction (movement only)
+}
+```
+
+## Usage Examples
+
+### Basic Rotation
+
+```kotlin
+object ModuleAimAssist : ClientModule(...) {
+    val rotations = tree(RotationsConfigurable())
+    
+    private val tickHandler = handler<GameTickEvent> {
+        val target = findTarget() ?: return@handler
+        
+        val targetRotation = aimAtEntity(target)
+        
+        RotationManager.setRotationTarget(
+            rotation = targetRotation,
+            considerInventory = true,
+            valueGroup = rotations,
+            priority = Priority.IMPORTANT,
+            provider = this
+        )
+    }
+}
+```
+
+### Rotation with Callback
+
+```kotlin
+val targetRotation = aimAtBlock(targetPos)
+
+RotationManager.setRotationTarget(
+    rotation = targetRotation,
+    considerInventory = true,
+    valueGroup = rotations,
+    priority = Priority.IMPORTANT,
+    provider = this,
+    whenReached = {
+        // Place block when rotation reached
+        placeBlock(targetPos)
+    }
+)
+```
+
+### Checking Server Rotation
+
+```kotlin
+val serverRot = RotationManager.serverRotation
+val currentRot = RotationManager.currentRotation
+
+if (serverRot != currentRot) {
+    // Server hasn't received our rotation yet
+    // Wait before attacking
+}
+```
+
+### Smooth Rotation to Target
+
+```kotlin
+private fun aimAtEntity(entity: Entity): Rotation {
+    val eyePos = player.getEyePosition(1.0f)
+    val targetPos = entity.boundingBox.center
+    
+    val diffX = targetPos.x - eyePos.x
+    val diffY = targetPos.y - eyePos.y  
+    val diffZ = targetPos.z - eyePos.z
+    
+    val distance = sqrt(diffX * diffX + diffZ * diffZ)
+    
+    val yaw = Math.toDegrees(atan2(diffZ, diffX)).toFloat() - 90f
+    val pitch = -Math.toDegrees(atan2(diffY, distance)).toFloat()
+    
+    return Rotation(yaw, pitch)
+}
+```
+
+## Priority System
+
+```kotlin
+enum class Priority(val priority: Int) {
+    NOT_IMPORTANT(0),
+    NORMAL(10),
+    IMPORTANT(20),
+    IMPORTANT_FOR_PLAYER_LIFE(30),
+    IMPORTANT_FOR_USAGE_CORRECTNESS(40)
+}
+```
+
+Higher priority rotations override lower priority ones.
+
+## Best Practices
+
+1. **Use appropriate priority** - Combat modules should use IMPORTANT or higher
+2. **Consider inventory state** - Set `considerInventory = true` for combat
+3. **Use callbacks** - `whenReached` for precise timing
+4. **Check server rotation** - Ensure rotation was sent before critical actions
+5. **Normalize rotations** - Always call `.normalize()` on custom rotations
+6. **Use movement correction** - SILENT for most cases, CHANGE_LOOK for legit
+
+## Integration with Combat
+
+RotationManager integrates with CombatManager:
+
+```kotlin
+if (CombatManager.shouldPauseRotation) {
+    // Rotation updates paused (e.g., player eating)
+    return
+}
+```
+
+## Integration with InventoryManager
+
+Rotations can be blocked when inventory is open:
+
+```kotlin
+if (rotationTarget.considerInventory && InventoryManager.isInventoryOpen) {
+    // Don't update rotation
+    return
+}
+```
+
+## Rotation Interpolation
+
+RotationManager smoothly interpolates between rotations:
+
+```kotlin
+private fun interpolate(
+    from: Rotation,
+    to: Rotation,
+    speed: Float
+): Rotation {
+    val diff = to - from
+    val step = diff.coerceIn(-speed, speed)
+    return from + step
+}
+```
+
+## See Also
+
+- [CombatManager](/api/combat-manager) - Combat state management
+- [InventoryManager](/api/inventory-manager) - Inventory state
+- [ClientModule](/api/client-module) - Module implementation

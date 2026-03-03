@@ -1,0 +1,321 @@
+---
+title: "AutoConfig"
+description: "Automatic configuration loading system for server-specific settings"
+---
+
+## Overview
+
+The `AutoConfig` system automatically loads optimal module configurations based on the server you're connected to. It downloads configs from the LiquidBounce API and applies them seamlessly.
+
+**Package:** `net.ccbluex.liquidbounce.config.autoconfig`
+
+## Object Declaration
+
+```kotlin
+object AutoConfig
+```
+
+## Properties
+
+<ParamField path="loadingNow" type="Boolean">
+  Whether a config is currently being loaded.
+  
+  ```kotlin
+  @Volatile
+  var loadingNow: Boolean
+  ```
+  
+  When true, module toggle notifications are suppressed.
+</ParamField>
+
+<ParamField path="includeConfiguration" type="IncludeConfiguration">
+  Determines which settings to include when saving configs.
+  
+  ```kotlin
+  var includeConfiguration: IncludeConfiguration
+  ```
+</ParamField>
+
+<ParamField path="configs" type="Array<AutoSettings>?">
+  Available auto-configs from the API.
+  
+  ```kotlin
+  @Volatile
+  var configs: Array<AutoSettings>?
+      private set
+  ```
+</ParamField>
+
+## Core Methods
+
+### reloadConfigs
+
+```kotlin
+suspend fun reloadConfigs(): Boolean
+```
+
+Reloads the list of available auto-configs from the LiquidBounce API.
+
+**Returns:** `true` if successfully reloaded, `false` on error
+
+**Example:**
+```kotlin
+val success = AutoConfig.reloadConfigs()
+if (success) {
+    println("Found ${AutoConfig.configs?.size} configs")
+}
+```
+
+### withLoading
+
+```kotlin
+inline fun withLoading(block: () -> Unit)
+```
+
+Executes code block with `loadingNow` flag set.
+
+**Example:**
+```kotlin
+AutoConfig.withLoading {
+    // Load config
+    // Notifications suppressed during this block
+}
+```
+
+## AutoSettings Class
+
+```kotlin
+data class AutoSettings(
+    val name: String,
+    val type: AutoSettingsType,
+    val status: AutoSettingsStatusType,
+    val server: String?,
+    val protocolVersion: Int?
+)
+```
+
+<ParamField path="name" type="String">
+  Config name/identifier
+</ParamField>
+
+<ParamField path="type" type="AutoSettingsType">
+  Config category (Server, Minigame, Global)
+</ParamField>
+
+<ParamField path="status" type="AutoSettingsStatusType">
+  Config status (Active, Experimental, Deprecated)
+</ParamField>
+
+<ParamField path="server" type="String?">
+  Target server address (null for global configs)
+</ParamField>
+
+<ParamField path="protocolVersion" type="Int?">
+  Target Minecraft protocol version (null for any version)
+</ParamField>
+
+## AutoSettingsType Enum
+
+```kotlin
+enum class AutoSettingsType {
+    SERVER,     // Server-specific config (e.g., Hypixel)
+    MINIGAME,   // Minigame-specific (e.g., BedWars, SkyWars)
+    GLOBAL      // Global optimization config
+}
+```
+
+## AutoSettingsStatusType Enum
+
+```kotlin
+enum class AutoSettingsStatusType {
+    ACTIVE,       // Tested and working
+    EXPERIMENTAL, // New, might need adjustments
+    DEPRECATED    // Old, may not work on current version
+}
+```
+
+## Usage Examples
+
+### Loading Available Configs
+
+```kotlin
+val configs = AutoConfig.configs
+if (configs != null) {
+    for (config in configs) {
+        println("${config.name} - ${config.type}")
+        println("  Status: ${config.status}")
+        println("  Server: ${config.server ?: "Any"}")
+    }
+}
+```
+
+### Filtering Configs
+
+```kotlin
+// Get configs for current server
+val currentServer = mc.currentServer?.ip
+val serverConfigs = AutoConfig.configs?.filter {
+    it.server?.equals(currentServer, ignoreCase = true) == true
+}
+
+// Get active configs only
+val activeConfigs = AutoConfig.configs?.filter {
+    it.status == AutoSettingsStatusType.ACTIVE
+}
+
+// Get minigame configs
+val minigameConfigs = AutoConfig.configs?.filter {
+    it.type == AutoSettingsType.MINIGAME
+}
+```
+
+### Loading Config Programmatically
+
+```kotlin
+suspend fun loadConfigForServer(serverIp: String) {
+    // Reload available configs
+    if (!AutoConfig.reloadConfigs()) {
+        chat("Failed to load configs from API")
+        return
+    }
+    
+    // Find matching config
+    val config = AutoConfig.configs?.firstOrNull {
+        it.server?.equals(serverIp, ignoreCase = true) == true &&
+        it.status == AutoSettingsStatusType.ACTIVE
+    }
+    
+    if (config != null) {
+        AutoConfig.withLoading {
+            // Load config
+            loadAutoConfig(config)
+        }
+        chat("Loaded config: ${config.name}")
+    } else {
+        chat("No config found for $serverIp")
+    }
+}
+```
+
+## IncludeConfiguration
+
+```kotlin
+data class IncludeConfiguration(
+    val includeBinds: Boolean = true,
+    val includeHidden: Boolean = true,
+    val includeEnabled: Boolean = true
+)
+```
+
+<ParamField path="includeBinds" type="Boolean" default="true">
+  Include keybind settings in saved configs
+</ParamField>
+
+<ParamField path="includeHidden" type="Boolean" default="true">
+  Include module hidden states in saved configs
+</ParamField>
+
+<ParamField path="includeEnabled" type="Boolean" default="true">
+  Include module enabled states in saved configs
+</ParamField>
+
+### Customizing Config Export
+
+```kotlin
+// Save config without keybinds
+AutoConfig.includeConfiguration = IncludeConfiguration(
+    includeBinds = false,
+    includeHidden = true,
+    includeEnabled = true
+)
+
+ConfigSystem.store(ModuleManager.modulesConfig)
+
+// Restore default
+AutoConfig.includeConfiguration = IncludeConfiguration.DEFAULT
+```
+
+## Automatic Loading
+
+AutoConfig can automatically load configs when joining servers:
+
+```kotlin
+// Triggered on server join
+EventManager.handler<ServerConnectEvent> { event ->
+    val serverIp = event.serverInfo.address
+    
+    // Find matching config
+    val config = AutoConfig.configs?.firstOrNull {
+        it.server?.equals(serverIp, ignoreCase = true) == true &&
+        it.type == AutoSettingsType.SERVER
+    }
+    
+    if (config != null && ModuleAutoConfig.autoLoad) {
+        AutoConfig.withLoading {
+            loadAutoConfig(config)
+        }
+    }
+}
+```
+
+## Config Compatibility
+
+AutoConfig handles protocol version compatibility:
+
+```kotlin
+val compatibleConfigs = AutoConfig.configs?.filter { config ->
+    config.protocolVersion == null || 
+    config.protocolVersion == mc.protocolVersion
+}
+```
+
+## Best Practices
+
+1. **Check status before loading** - Prefer ACTIVE over EXPERIMENTAL
+2. **Reload configs periodically** - Configs are updated on API
+3. **Match protocol versions** - Ensure config is for your MC version
+4. **Suppress notifications during load** - Use `withLoading`
+5. **Provide fallback configs** - Handle API failures gracefully
+6. **Respect user preferences** - Don't auto-load without permission
+
+## Integration with ModuleAutoConfig
+
+The AutoConfig module provides UI and automation:
+
+```kotlin
+object ModuleAutoConfig : ClientModule(...) {
+    val autoLoad by boolean("AutoLoad", true)
+    val preferActive by boolean("PreferActive", true)
+    val notifyOnLoad by boolean("NotifyOnLoad", true)
+}
+```
+
+## API Endpoints
+
+AutoConfig communicates with LiquidBounce API:
+
+- **List Configs:** `GET /api/v1/client/autosettings`
+- **Download Config:** `GET /api/v1/client/autosettings/{name}`
+
+## Error Handling
+
+```kotlin
+try {
+    if (!AutoConfig.reloadConfigs()) {
+        throw Exception("Failed to reload configs")
+    }
+    
+    AutoConfig.withLoading {
+        // Load config
+    }
+} catch (e: Exception) {
+    logger.error("AutoConfig error", e)
+    chat("Failed to load config: ${e.message}")
+}
+```
+
+## See Also
+
+- [ConfigSystem](/api/config-system) - Configuration management
+- [ModuleManager](/api/module-manager) - Module management
+- [Value Types](/api/value-types) - Configuration values

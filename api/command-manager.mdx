@@ -1,0 +1,274 @@
+---
+title: "CommandManager"
+description: "Manages command registration, parsing, and execution with auto-completion support"
+---
+
+## Overview
+
+The `CommandManager` handles all command-related functionality in LiquidBounce, including command registration, parsing, execution, and auto-completion. It provides a flexible system for creating commands with parameters and subcommands.
+
+**Package:** `net.ccbluex.liquidbounce.features.command`
+
+## Object Declaration
+
+```kotlin
+object CommandManager : Collection<Command>
+```
+
+## Global Settings
+
+```kotlin
+object GlobalSettings : ValueGroup("Commands") {
+    var prefix by text("Prefix", ".")
+    val hintCount by int("HintCount", 5, 0..10)
+}
+```
+
+<ParamField path="prefix" type="String" default=".">
+  Command prefix character(s)
+  
+  ```kotlin
+  var prefix: String
+  ```
+  
+  **Example:** `.friend add Player`
+</ParamField>
+
+<ParamField path="hintCount" type="Int" default="5">
+  Number of command suggestions to show for unknown commands
+  
+  ```kotlin
+  val hintCount: Int
+  ```
+</ParamField>
+
+## Core Methods
+
+### Command Registration
+
+<ParamField path="registerInbuilt()" type="fun registerInbuilt()">
+  Registers all built-in LiquidBounce commands.
+  
+  ```kotlin
+  fun registerInbuilt()
+  ```
+  
+  Registers commands including:
+  - **Client Management:** Client, Config, LocalConfig, Debug
+  - **Module Control:** Toggle, Bind, Hide, Panic, Value
+  - **Friends:** Friend
+  - **Utility:** Help, Clear, Targets
+  - **Script:** Script
+  - **Creative:** ItemRename, ItemGive, ItemSkull, ItemStack, ItemEnchant
+  - **Teleport:** VClip, Teleport, PlayerTeleport
+  - **Info:** Ping, Tps, ServerInfo, Username, Coordinates
+  - **Other:** Say, FakePlayer, RemoteView, XRay, AutoDisable, Models, Translate, AutoTranslate, Marketplace
+</ParamField>
+
+<ParamField path="addCommand()" type="fun addCommand(command: Command)">
+  Adds a custom command to the manager.
+  
+  ```kotlin
+  fun addCommand(command: Command)
+  ```
+  
+  Throws an error if command name already exists.
+</ParamField>
+
+<ParamField path="removeCommand()" type="fun removeCommand(command: Command)">
+  Removes a command from the manager.
+  
+  ```kotlin
+  fun removeCommand(command: Command)
+  ```
+</ParamField>
+
+### Command Execution
+
+<ParamField path="execute()" type="fun execute(cmd: String)">
+  Executes a command string.
+  
+  ```kotlin
+  @ScriptApiRequired
+  fun execute(cmd: String)
+  ```
+  
+  **Example:**
+  ```kotlin
+  CommandManager.execute(".toggle KillAura")
+  CommandManager.execute(".friend add \"Senk Ju\"")
+  ```
+  
+  **Throws:** `CommandException` if command is invalid or parameters are incorrect
+</ParamField>
+
+### Command Parsing
+
+<ParamField path="tokenizeCommand()" type="fun tokenizeCommand(line: String): Pair<List<String>, List<Int>>">
+  Tokenizes a command string into arguments.
+  
+  ```kotlin
+  fun tokenizeCommand(line: String): Pair<List<String>, List<Int>>
+  ```
+  
+  **Returns:** Pair of tokenized arguments and their starting indices
+  
+  **Example:**
+  ```kotlin
+  // Input: `.friend add "Senk Ju"`
+  // Output: [[`.friend`, `add`, `Senk Ju`], [0, 8, 12]]
+  val (args, indices) = CommandManager.tokenizeCommand(".friend add \"Senk Ju\"")
+  ```
+  
+  **Features:**
+  - Quoted strings with spaces: `"My Name"`
+  - Escape characters: `\"`, `\\`
+  - Multi-word arguments
+</ParamField>
+
+### Auto-Completion
+
+<ParamField path="autoComplete()" type="fun autoComplete(origCmd: String, start: Int): CompletableFuture<Suggestions>">
+  Provides auto-completion suggestions for partial commands.
+  
+  ```kotlin
+  fun autoComplete(origCmd: String, start: Int): CompletableFuture<Suggestions>
+  ```
+  
+  **Parameters:**
+  - `origCmd` - Full command text including prefix
+  - `start` - Cursor position
+  
+  **Returns:** Suggestions for completion
+</ParamField>
+
+## Usage Examples
+
+### Executing Commands
+
+```kotlin
+// Simple command
+CommandManager.execute(".help")
+
+// Command with arguments
+CommandManager.execute(".toggle KillAura")
+
+// Command with quoted arguments
+CommandManager.execute(".friend add \"Senk Ju\"")
+
+// Nested subcommands
+CommandManager.execute(".config load HypixelBedwars")
+```
+
+### Tokenizing Commands
+
+```kotlin
+val (args, indices) = CommandManager.tokenizeCommand(".friend add Player137")
+println(args) // [.friend, add, Player137]
+println(indices) // [0, 8, 12]
+
+// With quotes
+val (args2, _) = CommandManager.tokenizeCommand(".say \"Hello World\"")
+println(args2) // [.say, Hello World]
+```
+
+### Creating Custom Command
+
+```kotlin
+val myCommand = Command(
+    name = "greet",
+    aliases = listOf("hello", "hi")
+) {
+    val nameParam = parameter<String>(
+        name = "name",
+        required = true
+    )
+    
+    handler { context ->
+        val name = context[nameParam]
+        chat("Hello, $name!")
+    }
+}
+
+CommandManager.addCommand(myCommand)
+
+// Usage: .greet YourName
+```
+
+### Command with Subcommands
+
+```kotlin
+val configCommand = Command("config") {
+    subcommand("load") {
+        val nameParam = parameter<String>("name", required = true)
+        handler { context ->
+            val name = context[nameParam]
+            // Load config
+        }
+    }
+    
+    subcommand("save") {
+        val nameParam = parameter<String>("name", required = true)
+        handler { context ->
+            val name = context[nameParam]
+            // Save config
+        }
+    }
+}
+
+CommandManager.addCommand(configCommand)
+```
+
+## Error Handling
+
+### CommandException
+
+Thrown when command execution fails:
+
+```kotlin
+try {
+    CommandManager.execute(".invalid command")
+} catch (e: CommandException) {
+    // Handle error
+    println(e.message)
+    println(e.usageInfo) // Suggested commands
+}
+```
+
+### Common Errors
+
+1. **Unknown Command** - Command not found, suggestions provided
+2. **Invalid Usage** - Wrong number of arguments
+3. **Command Takes No Parameters** - Arguments provided to parameterless command
+4. **Parameter Required** - Missing required parameter
+5. **Unknown Parameter** - Too many arguments
+6. **Invalid Parameter Value** - Parameter validation failed
+
+## Command Suggestions
+
+When an unknown command is entered, CommandManager uses Levenshtein distance to suggest similar commands:
+
+```kotlin
+// Input: .toggl KillAura
+// Suggestions:
+//   - toggle
+//   - binds
+//   - bind
+```
+
+Number of suggestions controlled by `GlobalSettings.hintCount`.
+
+## Best Practices
+
+1. **Use descriptive command names** - Clear and concise
+2. **Provide aliases** - Common abbreviations for frequently used commands
+3. **Add parameter validation** - Prevent invalid input
+4. **Support auto-completion** - Improve user experience
+5. **Handle errors gracefully** - Provide helpful error messages
+6. **Use subcommands** - Organize complex command hierarchies
+
+## See Also
+
+- [Command Builder](/api/command-builder) - Creating commands with DSL
+- [Parameters](/api/parameters) - Command parameter system
+- [Parameter Types](/api/parameters) - Built-in parameter types

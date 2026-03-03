@@ -1,0 +1,531 @@
+---
+title: 'Configuration'
+description: 'Understanding the configuration system in LiquidBounce'
+icon: 'gear'
+---
+
+## What is Configuration?
+
+The configuration system in LiquidBounce manages all settings, module states, and user preferences. It provides a hierarchical structure for storing and loading configurations, allowing you to save different setups for various scenarios.
+
+<Info>
+The configuration system is implemented in `ConfigSystem.kt` and uses a hierarchy-based approach with JSON serialization.
+</Info>
+
+## Configuration Structure
+
+Configurations are organized hierarchically:
+
+```
+LiquidBounce/
+├── configs/           # User configuration files
+├── backups/           # Configuration backups
+└── *.json            # Root configuration files
+```
+
+### Configuration Root
+
+The configuration system uses a root folder in your Minecraft directory:
+
+```kotlin
+val rootFolder = File(mc.gameDirectory, LiquidBounce.CLIENT_NAME).apply {
+    if (!exists()) {
+        isFirstLaunch = true
+        mkdir()
+    }
+}
+```
+
+<Note>
+Source: `ConfigSystem.kt:56-65`
+</Note>
+
+## Value Types
+
+LiquidBounce supports various value types for configuration:
+
+<CardGroup cols={2}>
+  <Card title="Boolean" icon="toggle-on">
+    True/false toggles for binary settings
+  </Card>
+  <Card title="Integer" icon="hashtag">
+    Whole numbers with optional min/max ranges
+  </Card>
+  <Card title="Float" icon="calculator">
+    Decimal numbers for precise values
+  </Card>
+  <Card title="Text" icon="text">
+    String values for names and text input
+  </Card>
+  <Card title="Range" icon="sliders">
+    Min/max value pairs (e.g., 3.0..6.0)
+  </Card>
+  <Card title="Choice" icon="list">
+    Selection from predefined options
+  </Card>
+  <Card title="Color" icon="palette">
+    RGB/RGBA color values
+  </Card>
+  <Card title="Block/Item" icon="cube">
+    Minecraft blocks or items
+  </Card>
+  <Card title="Multi-Choice" icon="list-check">
+    Multiple selections from a list
+  </Card>
+  <Card title="Mode Group" icon="layer-group">
+    Grouped settings with multiple modes
+  </Card>
+</CardGroup>
+
+### Value Implementation
+
+Values are implemented in the `Value` class:
+
+```kotlin
+open class Value<T : Any>(
+    val name: String,
+    val aliases: List<String> = emptyList(),
+    private var defaultValue: T,
+    val valueType: ValueType,
+    var independentDescription: Boolean = false
+)
+```
+
+<Note>
+Source: `Value.kt:63-73`
+</Note>
+
+## Value Properties
+
+Each value has several important properties:
+
+### Key Path
+
+Values are identified by hierarchical keys:
+
+```kotlin
+val baseKey: String = "${ConfigSystem.KEY_PREFIX}.module.${name.toLowerCamelCase()}"
+```
+
+Example: `liquidbounce.module.killAura.range`
+
+### Default Value
+
+Each value stores its default state for restoration:
+
+```kotlin
+open fun restore() {
+    set(defaultValue)
+}
+```
+
+<Note>
+Source: `Value.kt:254-256`
+</Note>
+
+### Value Listeners
+
+Values support change listeners for reactive behavior:
+
+```kotlin
+fun onChange(listener: ValueListener<T>)
+fun onChanged(listener: ValueChangedListener<T>)
+```
+
+<Note>
+Source: `Value.kt:264-269`
+</Note>
+
+## Saving and Loading Configs
+
+### Automatic Saving
+
+LiquidBounce automatically saves configurations when:
+- You change a setting
+- You close the game
+- You switch configurations
+
+### Manual Operations
+
+<Tabs>
+  <Tab title="Save">
+    ```kotlin
+    // Save all configs
+    ConfigSystem.storeAll()
+    
+    // Save specific config
+    ConfigSystem.store(config)
+    ```
+    
+    Or use the command:
+    ```bash
+    .config save myconfig
+    ```
+  </Tab>
+  
+  <Tab title="Load">
+    ```kotlin
+    // Load all configs
+    ConfigSystem.loadAll()
+    
+    // Load specific config
+    ConfigSystem.load(config)
+    ```
+    
+    Or use the command:
+    ```bash
+    .config load myconfig
+    ```
+  </Tab>
+  
+  <Tab title="Backup">
+    ```kotlin
+    // Create a backup
+    ConfigSystem.backup("my-backup")
+    
+    // Restore from backup
+    ConfigSystem.restore("my-backup")
+    ```
+  </Tab>
+</Tabs>
+
+### Configuration Files
+
+Configurations are stored as JSON files:
+
+```json
+{
+  "name": "modules",
+  "value": [
+    {
+      "name": "KillAura",
+      "value": [
+        {
+          "name": "Range",
+          "value": 4.2
+        },
+        {
+          "name": "enabled",
+          "value": true
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Serialization and Deserialization
+
+The configuration system uses Gson for JSON processing:
+
+### Serialization
+
+```kotlin
+fun serializeValueGroup(valueGroup: ValueGroup, writer: Writer, gson: Gson = fileGson) {
+    gson.newJsonWriter(writer).use {
+        gson.toJson(valueGroup, ValueGroup::class.javaObjectType, it)
+    }
+}
+```
+
+<Note>
+Source: `ConfigSystem.kt:228-232`
+</Note>
+
+### Deserialization
+
+```kotlin
+fun deserializeValueGroup(valueGroup: ValueGroup, reader: Reader, gson: Gson = fileGson) {
+    gson.newJsonReader(reader).use { reader ->
+        deserializeValueGroup(valueGroup, reader.parseTree())
+    }
+}
+```
+
+<Note>
+Source: `ConfigSystem.kt:243-247`
+</Note>
+
+## Auto-Config Feature
+
+One of LiquidBounce's most powerful features is the Auto-Config system, which provides server-optimized configurations.
+
+<Info>
+Auto-configs are community-made configurations designed for specific servers and game modes.
+</Info>
+
+### What is Auto-Config?
+
+Auto-config automatically adjusts your settings for optimal performance on specific servers. It includes:
+
+- Module enable/disable states
+- Optimized value settings
+- Server-specific configurations
+- Protocol version information
+- Bypass status indicators
+
+### Loading Auto-Configs
+
+```kotlin
+suspend fun loadAutoConfig(autoConfig: AutoSettings) = withLoading {
+    ClientApi.requestSettingsScript(autoConfig.settingId).use(::loadAutoConfig)
+}
+```
+
+<Note>
+Source: `AutoConfig.kt:102-104`
+</Note>
+
+### Auto-Config Metadata
+
+Auto-configs include metadata about their creation:
+
+- **Server Address**: Target server
+- **Protocol Version**: Minecraft version
+- **Author**: Who created it
+- **Date/Time**: When it was created
+- **Client Version**: LiquidBounce version used
+- **Status**: Bypass status (bypassing, outdated, etc.)
+
+```kotlin
+jsonObject.addProperty("author", author)
+jsonObject.addProperty("date", date)
+jsonObject.addProperty("time", time)
+jsonObject.addProperty("clientVersion", LiquidBounce.clientVersion)
+jsonObject.addProperty("protocolName", protocolName)
+jsonObject.addProperty("protocolVersion", protocolVersion)
+```
+
+<Note>
+Source: `AutoConfig.kt:289-298`
+</Note>
+
+## Value Groups
+
+Value groups organize related settings together:
+
+### Types of Value Groups
+
+<AccordionGroup>
+  <Accordion title="ValueGroup">
+    Basic grouping of related values
+    
+    ```kotlin
+    object GlobalSettings : ValueGroup("Commands") {
+        var prefix by text("Prefix", ".")
+        val hintCount by int("HintCount", 5, 0..10)
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="ToggleableValueGroup">
+    Groups that can be enabled/disabled (used by modules)
+    
+    ```kotlin
+    open class ClientModule(
+        name: String,
+        category: ModuleCategory,
+        state: Boolean = false
+    ) : ToggleableValueGroup(null, name, state)
+    ```
+  </Accordion>
+  
+  <Accordion title="ModeValueGroup">
+    Groups with multiple selectable modes
+    
+    ```kotlin
+    val modes = choices(
+        "Mode",
+        VanillaMode,
+        CustomMode,
+        active = VanillaMode
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Best Practices
+
+<Steps>
+  <Step title="Organize by Purpose">
+    Create separate configs for different servers or game modes
+  </Step>
+  <Step title="Use Descriptive Names">
+    Name your configs clearly: `hypixel-bedwars`, `survival-vanilla`, etc.
+  </Step>
+  <Step title="Backup Regularly">
+    The system auto-backups, but manual backups before major changes are wise
+  </Step>
+  <Step title="Test Auto-Configs">
+    Always test auto-configs in a safe environment before using on main servers
+  </Step>
+  <Step title="Document Changes">
+    Keep notes about what each config is optimized for
+  </Step>
+</Steps>
+
+## Value State Management
+
+Values use reactive state management with StateFlow:
+
+```kotlin
+private val stateFlow = MutableStateFlow(inner)
+
+fun asStateFlow(): StateFlow<T> = stateFlow
+```
+
+<Note>
+Source: `Value.kt:91-93`
+</Note>
+
+This allows UI components to reactively update when values change.
+
+## Include Configuration
+
+When creating auto-configs, you can control what gets included:
+
+```kotlin
+var includeConfiguration = IncludeConfiguration.Companion.DEFAULT
+```
+
+This determines:
+- Whether to include module binds
+- Whether to include hidden states
+- Which modules to include
+- Which categories to include
+
+## Finding Values by Key
+
+The configuration system provides lookup functions:
+
+```kotlin
+fun findValueByKey(key: String): Value<*>? {
+    ensureRootKeys()
+    val normalizedKey = normalizeKeyInput(key)
+    return configs.asSequence()
+        .flatMap { it.collectValuesRecursively().asSequence() }
+        .firstOrNull { it.key?.equals(normalizedKey, true) == true }
+}
+```
+
+<Note>
+Source: `ConfigSystem.kt:90-96`
+</Note>
+
+## Using Configurations via Commands
+
+<CodeGroup>
+```bash List Configs
+# Show all available configs
+.config list
+
+# Show local configs
+.localconfig list
+```
+
+```bash Load/Save
+# Save current setup
+.config save my-setup
+
+# Load a config
+.config load pvp-config
+
+# Delete a config
+.config delete old-setup
+```
+
+```bash Auto-Config
+# Load from online repository
+.config load auto <config-id>
+
+# Browse available auto-configs
+# (Use the in-game GUI)
+```
+</CodeGroup>
+
+## Configuration Events
+
+Values emit events when changed:
+
+```kotlin
+EventManager.callEvent(ValueChangedEvent(this))
+```
+
+<Note>
+Source: `Value.kt:243`
+</Note>
+
+Other parts of the client can listen to these events and react accordingly.
+
+## Immutable Values
+
+Some values are marked as immutable and cannot be changed:
+
+```kotlin
+fun immutable() = apply {
+    isImmutable = true
+}
+```
+
+<Note>
+Source: `Value.kt:260-262`
+</Note>
+
+Attempts to modify immutable values are silently ignored.
+
+## Conditional Inclusion
+
+Values can be conditionally excluded from configs:
+
+```kotlin
+fun doNotIncludeWhen(condition: () -> Boolean) = apply {
+    doNotInclude = condition
+}
+```
+
+<Note>
+Source: `Value.kt:276-278`
+</Note>
+
+This is useful for values that should only be saved in specific contexts.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Config Not Loading">
+    - Check if the file exists in the configs folder
+    - Verify JSON syntax is valid
+    - Look for error messages in the console
+    - Try reloading all configs with `.config reload`
+  </Accordion>
+  
+  <Accordion title="Settings Not Saving">
+    - Ensure LiquidBounce has write permissions
+    - Check if the value is marked as immutable
+    - Verify the config file isn't corrupted
+  </Accordion>
+  
+  <Accordion title="Auto-Config Issues">
+    - Verify your protocol version matches
+    - Check server compatibility
+    - Ensure you have the latest LiquidBounce version
+    - Try loading the config manually
+  </Accordion>
+</AccordionGroup>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Modules" icon="cube" href="/concepts/modules">
+    Learn about modules that configurations control
+  </Card>
+  <Card title="Commands" icon="terminal" href="/concepts/commands">
+    Use commands to manage configurations
+  </Card>
+  <Card title="Scripting" icon="code" href="/concepts/scripting">
+    Access configuration programmatically
+  </Card>
+  <Card title="ClickGUI" icon="window" href="/modules/render">
+    Manage settings through the GUI
+  </Card>
+</CardGroup>

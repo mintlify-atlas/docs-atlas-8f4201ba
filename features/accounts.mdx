@@ -1,0 +1,248 @@
+---
+title: Account Management
+description: Manage multiple Minecraft accounts with LiquidBounce's account system
+icon: user
+---
+
+# Account Management
+
+LiquidBounce features a comprehensive account management system that allows you to manage multiple Minecraft accounts and switch between them seamlessly. The `AccountManager` handles all account operations including authentication, storage, and session management.
+
+## Account Types
+
+LiquidBounce supports multiple account types through the `AccountService` system:
+
+<CardGroup cols={2}>
+  <Card title="Microsoft Account" icon="windows">
+    Premium accounts authenticated through Microsoft OAuth2 flow. Can join online servers.
+  </Card>
+  <Card title="Session Account" icon="key">
+    Accounts using session tokens. Can join online servers.
+  </Card>
+  <Card title="TheAltening" icon="server">
+    Accounts from TheAltening service. Can join online servers.
+  </Card>
+  <Card title="Cracked Account" icon="user-slash">
+    Offline mode accounts. Can only join cracked servers.
+  </Card>
+</CardGroup>
+
+## Adding Accounts
+
+### Microsoft Account
+
+Microsoft accounts use the OAuth2 authentication flow:
+
+```kotlin
+AccountManager.newMicrosoftAccount { url ->
+    // Open the authentication URL in a browser
+    // User completes authentication
+    // Account is automatically added on success
+}
+```
+
+The OAuth flow:
+1. Calls `MicrosoftAccount.buildFromOpenBrowser()` with an `OAuthHandler`
+2. Opens a browser window for user authentication
+3. Receives authentication callback
+4. Stores the account in the accounts list
+5. Saves to configuration via `ConfigSystem.store()`
+
+<Note>
+The `AccountManager` prevents multiple simultaneous login attempts by caching the active OAuth URL.
+</Note>
+
+### Session Account
+
+Add an account using a session token:
+
+```kotlin
+AccountManager.newSessionAccount(token)
+```
+
+Supports both:
+- Microsoft refresh tokens (starting with "M.")
+- Session tokens from other sources
+
+### Cracked Account
+
+Create an offline mode account:
+
+```kotlin
+AccountManager.newCrackedAccount(
+    username = "PlayerName",
+    online = false  // Set to true for online UUID lookup
+)
+```
+
+<Warning>
+Cracked accounts can only join servers with `online-mode=false`. Username must be 1-16 characters.
+</Warning>
+
+### TheAltening
+
+Add accounts from TheAltening service:
+
+```kotlin
+// Add existing account
+AccountManager.newAlteningAccount(accountToken)
+
+// Generate new account (requires API token)
+AccountManager.generateAlteningAccount(apiToken)
+```
+
+## Managing Accounts
+
+### Login to Account
+
+Switch to a different account by ID:
+
+```kotlin
+AccountManager.loginAccount(id)
+```
+
+The login process (from AccountManager.kt:82):
+1. Validates the account exists
+2. Calls `account.login()` to get session credentials
+3. Creates a `SessionWithService` instance
+4. Generates profile keys for signing
+5. Updates `mc.user` with new session
+6. Updates Minecraft services (session service, profile repository)
+7. Fires `SessionEvent` and `AccountManagerLoginResultEvent`
+
+### Direct Login
+
+Login directly without storing the account:
+
+```kotlin
+AccountManager.loginDirectAccount(account)
+```
+
+### Restore Initial Session
+
+Return to the original session from client startup:
+
+```kotlin
+AccountManager.restoreInitial()
+```
+
+<Info>
+The initial session is captured during `AccountManager` initialization and preserved for restoration.
+</Info>
+
+### Account Organization
+
+```kotlin
+// Mark as favorite
+AccountManager.favoriteAccount(id)
+AccountManager.unfavoriteAccount(id)
+
+// Reorder accounts
+AccountManager.swapAccounts(index1, index2)
+AccountManager.orderAccounts(listOf(0, 2, 1, 3))
+
+// Remove account
+val removed = AccountManager.removeAccount(id)
+```
+
+## Account Storage
+
+Accounts are stored in the configuration system:
+
+```kotlin
+val accounts by list(name, mutableListOf<MinecraftAccount>(), ValueType.ACCOUNT)
+```
+
+The `AccountManager` is registered as a root config:
+
+```kotlin
+ConfigSystem.root(this)
+```
+
+All account modifications trigger automatic persistence via `ConfigSystem.store(this@AccountManager)`.
+
+## Events
+
+The account system fires several events:
+
+<CodeGroup>
+```kotlin AccountManagerLoginResultEvent
+// Fired when login completes
+EventManager.callEvent(
+    AccountManagerLoginResultEvent(
+        username = account.profile?.username,
+        error = null
+    )
+)
+```
+
+```kotlin AccountManagerAdditionResultEvent
+// Fired when account is added
+EventManager.callEvent(
+    AccountManagerAdditionResultEvent(
+        username = profile.username,
+        error = null
+    )
+)
+```
+
+```kotlin SessionEvent
+// Fired when session changes
+EventManager.callEvent(SessionEvent(session))
+```
+</CodeGroup>
+
+## Session Management
+
+LiquidBounce preserves session state through `SessionBundle`:
+
+```kotlin
+data class SessionBundle(
+    val session: Session,
+    val sessionService: SessionService?,
+    val profileKeys: ProfileKeyPairManager
+)
+```
+
+This ensures proper restoration of:
+- User profile and credentials
+- Authentication services
+- Profile key pairs for message signing
+
+## Code References
+
+<CardGroup cols={2}>
+  <Card title="AccountManager.kt" icon="file-code">
+    Main account management logic
+    <br/>`src/main/kotlin/net/ccbluex/liquidbounce/features/account/AccountManager.kt`
+  </Card>
+  <Card title="AccountService.kt" icon="shield">
+    Account service type definitions
+    <br/>`src/main/kotlin/net/ccbluex/liquidbounce/features/account/AccountService.kt`
+  </Card>
+  <Card title="OAuthClient.kt" icon="lock">
+    OAuth authentication flow
+    <br/>`src/main/kotlin/net/ccbluex/liquidbounce/api/services/auth/OAuthClient.kt`
+  </Card>
+  <Card title="SessionBundle.kt" icon="database">
+    Session state preservation
+    <br/>`src/main/kotlin/net/ccbluex/liquidbounce/features/account/SessionBundle.kt`
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Handle Errors">
+    Always check for error messages in result events to provide user feedback
+  </Step>
+  <Step title="Validate Tokens">
+    Ensure tokens are not empty before passing to account creation methods
+  </Step>
+  <Step title="Avoid Duplicates">
+    The system automatically prevents duplicate accounts by username
+  </Step>
+  <Step title="Thread Safety">
+    Login operations use `AtomicBoolean` to prevent concurrent login attempts
+  </Step>
+</Steps>

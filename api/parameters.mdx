@@ -1,0 +1,358 @@
+---
+title: "Parameters"
+description: "Command parameter system with validation and auto-completion"
+---
+
+## Overview
+
+The Parameter system provides type-safe command arguments with validation, auto-completion, and flexible configuration. Parameters can be required or optional, support varargs, and include custom verification logic.
+
+**Package:** `net.ccbluex.liquidbounce.features.command`
+
+## Parameter Class
+
+```kotlin
+class Parameter<T : Any>(
+    val name: String,
+    val required: Boolean,
+    val default: T?,
+    val vararg: Boolean,
+    val verifier: Verificator<T>?,
+    val autocompletionHandler: AutoCompletionProvider?
+)
+```
+
+<ParamField path="name" type="String" required>
+  Parameter name for display and error messages
+</ParamField>
+
+<ParamField path="required" type="Boolean" required>
+  Whether parameter must be provided
+</ParamField>
+
+<ParamField path="default" type="T?" required>
+  Default value if parameter is optional and not provided
+</ParamField>
+
+<ParamField path="vararg" type="Boolean" required>
+  If true, parameter consumes all remaining arguments as array
+</ParamField>
+
+<ParamField path="verifier" type="Verificator<T>?" required>
+  Validates and parses parameter value
+</ParamField>
+
+<ParamField path="autocompletionHandler" type="AutoCompletionProvider?" required>
+  Provides completion suggestions
+</ParamField>
+
+## Properties
+
+<ParamField path="command" type="Command?">
+  Parent command (set automatically)
+  
+  ```kotlin
+  var command: Command?
+  ```
+</ParamField>
+
+<ParamField path="index" type="Int">
+  Parameter index in command (set automatically)
+  
+  ```kotlin
+  var index: Int
+  ```
+</ParamField>
+
+<ParamField path="description" type="MutableComponent">
+  Translated parameter description
+  
+  ```kotlin
+  val description: MutableComponent
+  ```
+</ParamField>
+
+## Methods
+
+### nameAsText
+
+```kotlin
+fun nameAsText(): Component
+```
+
+Returns formatted parameter name with hover description:
+- Required: `<name>`
+- Optional: `[<name>]`
+- Vararg: `<name>...`
+
+## Verificator Interface
+
+```kotlin
+fun interface Verificator<T : Any> {
+    fun verifyAndParse(sourceText: String): Result<out T>
+    
+    sealed interface Result<T : Any> {
+        class Ok<T : Any>(val mappedResult: T) : Result<T>
+        class Error(val errorMessage: String) : Result<Nothing>
+    }
+}
+```
+
+### Creating Verificators
+
+```kotlin
+// Integer with range
+val intVerifier = Parameter.Verificator { text ->
+    val value = text.toIntOrNull()
+    if (value == null) {
+        Parameter.Verificator.Result.Error("Must be a number")
+    } else if (value !in 1..100) {
+        Parameter.Verificator.Result.Error("Must be between 1 and 100")
+    } else {
+        Parameter.Verificator.Result.Ok(value)
+    }
+}
+
+// Module verification
+val moduleVerifier = Parameter.Verificator { text ->
+    val module = ModuleManager[text]
+    Parameter.Verificator.Result.ofNullable(module) {
+        "Module '$text' not found"
+    }
+}
+
+// Enum verification
+val enumVerifier = Parameter.Verificator<MyEnum> { text ->
+    try {
+        Parameter.Verificator.Result.Ok(MyEnum.valueOf(text))
+    } catch (e: IllegalArgumentException) {
+        Parameter.Verificator.Result.Error("Invalid value. Valid values: ${MyEnum.values().joinToString()}")
+    }
+}
+```
+
+## AutoCompletionProvider
+
+```kotlin
+fun interface AutoCompletionProvider {
+    fun autocomplete(begin: String, args: List<String>): Iterable<String>
+}
+```
+
+<ParamField path="begin" type="String">
+  Current partial text of the parameter being completed
+</ParamField>
+
+<ParamField path="args" type="List<String>">
+  All current arguments of the command
+</ParamField>
+
+### Creating Auto-completion Providers
+
+```kotlin
+// Module names
+val moduleCompletion = AutoCompletionProvider { begin, _ ->
+    ModuleManager
+        .filter { it.name.startsWith(begin, ignoreCase = true) }
+        .map { it.name }
+}
+
+// File names
+val fileCompletion = AutoCompletionProvider { begin, _ ->
+    File(".")
+        .listFiles { file -> file.name.startsWith(begin, ignoreCase = true) }
+        ?.map { it.name }
+        ?: emptyList()
+}
+
+// Contextual completion
+val contextualCompletion = AutoCompletionProvider { begin, args ->
+    when (args.getOrNull(0)) {
+        "add" -> getAvailableItems(begin)
+        "remove" -> getCurrentItems(begin)
+        else -> emptyList()
+    }
+}
+```
+
+## Parameter Examples
+
+### Required String Parameter
+
+```kotlin
+val name = parameter<String>(
+    name = "name",
+    required = true
+)
+```
+
+### Optional Integer Parameter
+
+```kotlin
+val count = parameter(
+    name = "count",
+    required = false,
+    default = 10,
+    verifier = Parameter.Verificator { text ->
+        val value = text.toIntOrNull()
+        Parameter.Verificator.Result.ofNullable(value) {
+            "Must be a number"
+        }
+    }
+)
+```
+
+### Vararg String Parameter
+
+```kotlin
+val message = parameter<String>(
+    name = "message",
+    required = true,
+    vararg = true
+)
+
+// Usage: .say Hello world this is a message
+// message = ["Hello", "world", "this", "is", "a", "message"]
+```
+
+### Module Parameter with Validation
+
+```kotlin
+val module = parameter(
+    name = "module",
+    required = true,
+    verifier = Parameter.Verificator { text ->
+        val module = ModuleManager[text]
+        Parameter.Verificator.Result.ofNullable(module) {
+            "Module '$text' not found"
+        }
+    },
+    autocompletionHandler = AutoCompletionProvider { begin, _ ->
+        ModuleManager
+            .filter { it.name.startsWith(begin, ignoreCase = true) }
+            .map { it.name }
+    }
+)
+```
+
+### Float Parameter with Range
+
+```kotlin
+val speed = parameter(
+    name = "speed",
+    required = false,
+    default = 1.0f,
+    verifier = Parameter.Verificator { text ->
+        val value = text.toFloatOrNull()
+        when {
+            value == null -> Parameter.Verificator.Result.Error("Must be a number")
+            value < 0.1f -> Parameter.Verificator.Result.Error("Must be at least 0.1")
+            value > 10.0f -> Parameter.Verificator.Result.Error("Must be at most 10.0")
+            else -> Parameter.Verificator.Result.Ok(value)
+        }
+    }
+)
+```
+
+### Boolean Parameter
+
+```kotlin
+val enabled = parameter(
+    name = "enabled",
+    required = false,
+    default = true,
+    verifier = Parameter.Verificator { text ->
+        when (text.lowercase()) {
+            "true", "yes", "on", "1" -> Parameter.Verificator.Result.Ok(true)
+            "false", "no", "off", "0" -> Parameter.Verificator.Result.Ok(false)
+            else -> Parameter.Verificator.Result.Error("Must be true/false")
+        }
+    },
+    autocompletionHandler = AutoCompletionProvider { begin, _ ->
+        listOf("true", "false").filter { it.startsWith(begin, ignoreCase = true) }
+    }
+)
+```
+
+### Enum Parameter
+
+```kotlin
+enum class GameMode { SURVIVAL, CREATIVE, ADVENTURE, SPECTATOR }
+
+val gameMode = parameter(
+    name = "mode",
+    required = true,
+    verifier = Parameter.Verificator { text ->
+        try {
+            Parameter.Verificator.Result.Ok(GameMode.valueOf(text.uppercase()))
+        } catch (e: IllegalArgumentException) {
+            Parameter.Verificator.Result.Error(
+                "Invalid mode. Valid modes: ${GameMode.values().joinToString()}"
+            )
+        }
+    },
+    autocompletionHandler = AutoCompletionProvider { begin, _ ->
+        GameMode.values()
+            .map { it.name.lowercase() }
+            .filter { it.startsWith(begin, ignoreCase = true) }
+    }
+)
+```
+
+## Best Practices
+
+1. **Always provide verification** - Validate input before use
+2. **Add auto-completion** - Improves user experience significantly
+3. **Use meaningful names** - Parameter names appear in error messages
+4. **Provide helpful error messages** - Guide users to correct input
+5. **Use nullable defaults for optional parameters** - Clear intent
+6. **Varargs must be last** - Only one vararg per command, at the end
+7. **Parse early** - Convert strings in verificator, not in handler
+8. **Consider context** - Auto-completion can be context-aware
+
+## Common Parameter Types
+
+### Player Parameter
+
+```kotlin
+val player = parameter(
+    name = "player",
+    required = true,
+    verifier = Parameter.Verificator { text ->
+        val player = mc.level?.players()?.firstOrNull { 
+            it.gameProfile.name.equals(text, ignoreCase = true) 
+        }
+        Parameter.Verificator.Result.ofNullable(player) {
+            "Player '$text' not found"
+        }
+    },
+    autocompletionHandler = AutoCompletionProvider { begin, _ ->
+        mc.level?.players()
+            ?.map { it.gameProfile.name }
+            ?.filter { it.startsWith(begin, ignoreCase = true) }
+            ?: emptyList()
+    }
+)
+```
+
+### Block Parameter
+
+```kotlin
+val block = parameter(
+    name = "block",
+    required = true,
+    verifier = Parameter.Verificator { text ->
+        val block = BuiltInRegistries.BLOCK
+            .get(ResourceLocation(text))
+        Parameter.Verificator.Result.ofNullable(block) {
+            "Block '$text' not found"
+        }
+    }
+)
+```
+
+## See Also
+
+- [CommandManager](/api/command-manager) - Command execution system
+- [Command Builder](/api/command-builder) - Creating commands
+- [Parameter Presets](/api/parameters) - Pre-built parameter types

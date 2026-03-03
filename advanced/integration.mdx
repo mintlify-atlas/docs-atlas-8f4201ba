@@ -1,0 +1,504 @@
+---
+title: Integration Features
+description: Browser backend, client interop server, and external integrations
+icon: plug
+---
+
+LiquidBounce features advanced integration systems for browser rendering, client-server communication, and third-party mod compatibility.
+
+## Overview
+
+The integration system provides:
+- Embedded Chromium browser (MCEF/JCEF)
+- REST API and WebSocket server for UI communication
+- ViaFabricPlus protocol switching support
+- Theme and component management
+- External system browser fallback
+
+## Browser Backend System
+
+### BrowserBackendManager
+
+Manages browser initialization and lifecycle (`BrowserBackendManager.kt:39`).
+
+<CodeGroup>
+```kotlin Initialization
+fun makeDependenciesAvailable(taskManager: TaskManager) {
+    if (isSkipping) {
+        logger.warn("Environment variable 'LB_BROWSER_SKIP' is set to 'true'.")
+        return
+    }
+    
+    val browserBackend = when (backendName) {
+        "none" -> {
+            logger.warn("Environment variable 'LB_BROWSER_BACKEND' is set to 'none'.")
+            isSkipping = true
+            return
+        }
+        "cef" -> CefBrowserBackend()
+        "external" -> ExternalSystemBrowserBackend()
+        else -> error("Unknown browser backend: $backendName")
+    }
+    this.backend = browserBackend
+    browserBackend.makeDependenciesAvailable(taskManager, ::start)
+}
+```
+
+```kotlin Starting Browser
+fun start() {
+    logger.info("Initializing browser...")
+    RenderSystem.assertOnRenderThread()
+    
+    val browserBackend = backend ?: return
+    browserBackend.start()
+    
+    if (disableAcceleration) {
+        logger.warn("Environment variable 'LB_BROWSER_DISABLE_ACCELERATION' is set to 'true'.")
+    }
+    GlobalBrowserSettings
+    EventManager.callEvent(BrowserReadyEvent)
+    logger.info("Successfully initialized browser.")
+}
+```
+</CodeGroup>
+
+### Environment Variables
+
+<ParamField path="LB_BROWSER_SKIP" type="boolean" default="false">
+  Skip browser initialization entirely
+</ParamField>
+
+<ParamField path="LB_BROWSER_BACKEND" type="string" default="cef">
+  Browser backend to use (`cef`, `external`, `none`)
+</ParamField>
+
+<ParamField path="LB_BROWSER_DISABLE_ACCELERATION" type="boolean" default="false">
+  Disable hardware acceleration
+</ParamField>
+
+## CEF Browser Backend
+
+Chromium Embedded Framework integration via MCEF (`CefBrowserBackend.kt:64`).
+
+### Features
+
+<CardGroup cols={2}>
+  <Card title="Full Chromium" icon="chrome">
+    Complete Chromium browser engine in Minecraft
+  </Card>
+  
+  <Card title="Hardware Acceleration" icon="rocket">
+    GPU-accelerated rendering support
+  </Card>
+  
+  <Card title="Auto Downloads" icon="download">
+    Automatic JCEF library downloading
+  </Card>
+  
+  <Card title="Cache Management" icon="database">
+    Intelligent cache cleanup and management
+  </Card>
+</CardGroup>
+
+### MCEF Configuration
+
+```kotlin
+MCEF.INSTANCE.settings.apply {
+    userAgent = HttpClient.DEFAULT_AGENT
+    cacheDirectory = cacheFolder.resolve(System.currentTimeMillis().toString(16)).apply {
+        deleteOnExit()
+    }
+    librariesDirectory = librariesFolder
+    
+    // CEF Switches
+    appendCefSwitches("--no-proxy-server")
+}
+```
+
+### Directory Structure
+
+<ResponseField name="mcef/" type="directory">
+  MCEF root directory
+  
+  <Expandable title="Subdirectories">
+    <ResponseField name="libraries/" type="directory">
+      JCEF native libraries
+    </ResponseField>
+    
+    <ResponseField name="cache/" type="directory">
+      Browser cache directories (timestamped)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Cache Cleanup
+
+Automatic cleanup of old cache directories (`CefBrowserBackend.kt:129`):
+
+```kotlin
+fun cleanup() {
+    if (cacheFolder.exists()) {
+        cacheFolder.listFiles()
+            ?.filter { file ->
+                file.isDirectory && 
+                System.currentTimeMillis() - file.lastModified() > CACHE_CLEANUP_THRESHOLD
+            }
+            ?.sumOf { file ->
+                val fileSize = file.walkTopDown().sumOf { it.length() }
+                file.deleteRecursively()
+                fileSize
+            }
+    }
+}
+```
+
+<Info>
+  Cache directories older than 7 days are automatically cleaned up on startup.
+</Info>
+
+### Compatibility Checking
+
+```kotlin
+val resourceManager = MCEF.INSTANCE.newResourceManager()
+
+if (!resourceManager.isSystemCompatible) {
+    throw JcefIsntCompatible()
+}
+```
+
+<Warning>
+  JCEF requires specific system configurations. Not all systems support hardware acceleration.
+</Warning>
+
+## Client Interop Server
+
+HTTP/WebSocket server for browser-client communication (`ClientInteropServer.kt:44`).
+
+### Server Configuration
+
+<ParamField path="LB_INTEROP_SKIP" type="boolean" default="false">
+  Skip interop server initialization
+</ParamField>
+
+<ParamField path="LB_INTEROP_PORT" type="int" default="random">
+  Server port (defaults to random available port)
+</ParamField>
+
+<ParamField path="LB_INTEROP_AUTH_CODE" type="string" default="random">
+  Authentication code (16 random alphanumeric characters)
+</ParamField>
+
+### Server Initialization
+
+<Steps>
+  <Step title="Port Selection">
+    Automatically selects an available port if not specified
+  </Step>
+  
+  <Step title="Endpoint Registration">
+    Registers all REST API and WebSocket endpoints
+  </Step>
+  
+  <Step title="Middleware Setup">
+    Adds CORS and authentication middleware
+  </Step>
+  
+  <Step title="Resource Mounting">
+    Mounts theme files and marketplace resources
+  </Step>
+  
+  <Step title="Start Listening">
+    Begins accepting connections
+  </Step>
+</Steps>
+
+```kotlin
+suspend fun start() {
+    httpServer.apply {
+        routing {
+            get("/", ::getRootResponse)
+            registerInteropFunctions()
+            
+            LiquidBounce.resource("themes/liquidbounce.zip").use { stream ->
+                zip("/resource/liquidbounce", stream)
+            }
+            file("/local", ThemeManager.themesFolder)
+            file("/marketplace", MarketplaceManager.marketplaceRoot)
+        }
+        
+        middleware(CorsMiddleware())
+        middleware(AuthMiddleware())
+    }
+    
+    this.PORT = startServer(this.PORT)
+}
+```
+
+### API Endpoints
+
+The server exposes extensive REST API endpoints organized by category:
+
+<AccordionGroup>
+  <Accordion title="Client Functions" icon="desktop">
+    - `/api/v1/client/info` - Client information
+    - `/api/v1/client/modules` - Module management
+    - `/api/v1/client/accounts` - Account management
+    - `/api/v1/client/session` - Session data
+    - `/api/v1/client/theme` - Theme operations
+    - `/api/v1/client/components` - HUD components
+  </Accordion>
+  
+  <Accordion title="Game Functions" icon="gamepad">
+    - `/api/v1/game/player` - Player data
+    - `/api/v1/game/world` - World information
+    - `/api/v1/game/servers` - Server list
+    - `/api/v1/game/textures` - Texture access
+    - `/api/v1/game/input` - Input handling
+    - `/api/v1/game/registry` - Game registries
+  </Accordion>
+  
+  <Accordion title="Feature Functions" icon="star">
+    - `/api/v1/features/browser` - Browser control
+    - `/api/v1/features/protocol` - Protocol switching
+    - `/api/v1/features/reconnect` - Auto-reconnect
+  </Accordion>
+</AccordionGroup>
+
+### WebSocket Events
+
+Real-time event streaming to the browser:
+
+```kotlin
+// Register events with @WebSocketEvent annotation
+SocketEventListener.registerAll()
+```
+
+<Tip>
+  WebSocket events allow the browser UI to react instantly to in-game changes.
+</Tip>
+
+## Authentication System
+
+Secure authentication using randomly generated codes (`AuthMiddleware.kt`):
+
+```kotlin
+val AUTH_CODE: String = env("LB_INTEROP_AUTH_CODE", "net.ccbluex.liquidbounce.interop.authCode")
+    ?: RandomStringUtils.secure().nextAlphanumeric(16)
+```
+
+<Warning>
+  The auth code is generated on startup and must be included in requests from the browser.
+</Warning>
+
+## ViaFabricPlus Integration
+
+Support for protocol version switching when ViaFabricPlus is installed.
+
+### Protocol Detection
+
+```kotlin
+val usesViaFabricPlus: Boolean
+    get() = FabricLoader.getInstance().isModLoaded("viafabricplus")
+```
+
+### Automatic Protocol Switching
+
+When loading auto-configs with different protocol versions:
+
+```kotlin
+if (usesViaFabricPlus) {
+    if (inGame) {
+        chat(markAsError("Please reconnect to the server to apply the correct protocol."))
+    } else {
+        selectProtocolVersion(pVersion)
+    }
+} else {
+    chat(markAsError("Please install ViaFabricPlus to apply the correct protocol."))
+}
+```
+
+## Theme System
+
+Manage custom themes and UI components.
+
+### Theme Structure
+
+<ResponseField name="themes/" type="directory">
+  Theme storage directory
+  
+  <Expandable title="Contents">
+    <ResponseField name="liquidbounce.zip" type="file">
+      Default embedded theme
+    </ResponseField>
+    
+    <ResponseField name="custom-theme/" type="directory">
+      Custom theme directories
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### HUD Components
+
+The integration system supports various HUD component types:
+
+<CardGroup cols={3}>
+  <Card title="Web Components" icon="browser">
+    Browser-rendered HUD elements
+  </Card>
+  
+  <Card title="Native Components" icon="code">
+    Kotlin-rendered components
+  </Card>
+  
+  <Card title="Minimap" icon="map">
+    Real-time world minimap
+  </Card>
+</CardGroup>
+
+## Browser Lifecycle Management
+
+### Creating Browsers
+
+```kotlin
+val browser = backend.createBrowser(
+    url = "https://example.com",
+    position = BrowserViewport(x, y, width, height),
+    settings = BrowserSettings(),
+    priority = 0,
+    inputAcceptor = customInputHandler
+)
+```
+
+### Browser States
+
+<ResponseField name="Loading" type="state">
+  Browser is loading the page
+</ResponseField>
+
+<ResponseField name="Success" type="state">
+  Page loaded successfully (includes HTTP status code)
+</ResponseField>
+
+<ResponseField name="Failure" type="state">
+  Failed to load page (includes error code and message)
+</ResponseField>
+
+### Force Update
+
+Refresh all browser viewports:
+
+```kotlin
+fun forceUpdate() = mc.execute {
+    val browserBackend = backend ?: return@execute
+    
+    for (browser in browserBackend.browsers) {
+        try {
+            browser.viewport = browser.viewport
+        } catch (e: Exception) {
+            logger.error("Failed to update tab of '${browser.url}'", e)
+        }
+    }
+}
+```
+
+## External System Browser Backend
+
+Fallback browser backend using the system's default browser (`ExternalSystemBrowserBackend.kt`).
+
+<Info>
+  The external backend opens URLs in the system browser when CEF is unavailable or disabled.
+</Info>
+
+## Screen Management
+
+Custom screen types for browser integration:
+
+<Tabs>
+  <Tab title="Standalone">
+    Full-screen browser window
+  </Tab>
+  
+  <Tab title="Shared">
+    Browser alongside Minecraft UI
+  </Tab>
+  
+  <Tab title="Overlay">
+    Browser overlay on top of game
+  </Tab>
+  
+  <Tab title="Internet Explorer">
+    Built-in browser screen
+  </Tab>
+</Tabs>
+
+## Performance Considerations
+
+<CardGroup cols={2}>
+  <Card title="Render Thread" icon="microchip">
+    Browser operations must run on the render thread
+  </Card>
+  
+  <Card title="Message Loop" icon="arrows-rotate">
+    CEF message loop runs on every frame render
+  </Card>
+  
+  <Card title="Hardware Acceleration" icon="gauge-high">
+    Can be disabled for compatibility
+  </Card>
+  
+  <Card title="Priority System" icon="layer-group">
+    Browsers render in priority order
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="JCEF download fails">
+    Check internet connection and firewall settings. The system will automatically retry with a random port.
+  </Accordion>
+  
+  <Accordion title="Browser not rendering">
+    Ensure you're on the render thread and the backend is initialized.
+  </Accordion>
+  
+  <Accordion title="Port already in use">
+    The server automatically retries with different ports (up to 5 attempts).
+  </Accordion>
+  
+  <Accordion title="Authentication errors">
+    Verify the auth code is correctly passed from the interop server to the browser.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Initialize Early">
+    Start browser backend during client initialization
+  </Step>
+  
+  <Step title="Handle Failures">
+    Always provide fallback for systems where CEF is unavailable
+  </Step>
+  
+  <Step title="Clean Up Resources">
+    Properly shutdown browsers and servers on client exit
+  </Step>
+  
+  <Step title="Use Events">
+    Listen to BrowserReadyEvent before creating browsers
+  </Step>
+</Steps>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="MCEF Project" icon="github" href="https://github.com/CCBlueX/mcef">
+    LiquidBounce's MCEF fork
+  </Card>
+  
+  <Card title="Theme System" icon="palette" href="/features/themes">
+    Creating custom themes
+  </Card>
+</CardGroup>

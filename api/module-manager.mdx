@@ -1,0 +1,178 @@
+---
+title: "ModuleManager"
+description: "Manages all client modules and handles module registration, enabling, and event processing"
+---
+
+## Overview
+
+The `ModuleManager` is the central hub for managing all client modules (hacks) in LiquidBounce. It handles module registration, key bindings, state management, and provides access to all available modules.
+
+**Package:** `net.ccbluex.liquidbounce.features.module`
+
+## Object Declaration
+
+```kotlin
+object ModuleManager : EventListener, Collection<ClientModule>
+```
+
+## Properties
+
+<ParamField path="modulesConfig" type="Config">
+  Root configuration object containing all module configurations
+</ParamField>
+
+## Core Methods
+
+### Module Registration
+
+<ParamField path="registerInbuilt()" type="fun registerInbuilt()">
+  Registers all built-in LiquidBounce modules. Called during client initialization.
+  
+  ```kotlin
+  fun registerInbuilt()
+  ```
+  
+  Registers modules across all categories:
+  - Combat (KillAura, Velocity, Criticals, etc.)
+  - Movement (Fly, Speed, NoSlow, etc.)
+  - Player (AutoArmor, ChestStealer, NoFall, etc.)
+  - Render (ESP, Tracers, Nametags, etc.)
+  - World (Scaffold, Nuker, FastBreak, etc.)
+  - Exploit (Disabler, Phase, AntiHunger, etc.)
+  - Misc (AntiBot, Teams, AutoConfig, etc.)
+  - Fun (Derp, SkinDerp, Twerk, etc.)
+</ParamField>
+
+<ParamField path="addModule()" type="fun addModule(module: ClientModule)">
+  Adds a custom module to the module manager.
+  
+  ```kotlin
+  fun addModule(module: ClientModule)
+  ```
+  
+  Throws an error if a module with the same name is already registered.
+</ParamField>
+
+<ParamField path="removeModule()" type="fun removeModule(module: ClientModule)">
+  Removes a module from the module manager.
+  
+  ```kotlin
+  fun removeModule(module: ClientModule)
+  ```
+  
+  Also disables the module if it's running and unregisters its event handlers.
+</ParamField>
+
+### Module Access
+
+<ParamField path="get()" type="operator fun get(moduleName: String): ClientModule?">
+  Gets a module by name (case-insensitive).
+  
+  ```kotlin
+  operator fun get(moduleName: String): ClientModule?
+  ```
+  
+  **Example:**
+  ```kotlin
+  val killAura = ModuleManager["KillAura"]
+  ```
+</ParamField>
+
+<ParamField path="getModuleByName()" type="fun getModuleByName(module: String): ClientModule?">
+  Script API method to get a module by name (case-insensitive).
+  
+  ```kotlin
+  @ScriptApiRequired
+  fun getModuleByName(module: String): ClientModule?
+  ```
+</ParamField>
+
+<ParamField path="getModules()" type="fun getModules(): Collection<ClientModule>">
+  Returns all registered modules.
+  
+  ```kotlin
+  @ScriptApiRequired
+  fun getModules(): Collection<ClientModule>
+  ```
+</ParamField>
+
+<ParamField path="getCategories()" type="fun getCategories(): Array<String>">
+  Returns all module category names.
+  
+  ```kotlin
+  @ScriptApiRequired
+  fun getCategories(): Array<String>
+  ```
+</ParamField>
+
+## Event Handling
+
+ModuleManager handles several key events:
+
+### Key Bindings
+
+```kotlin
+private val keyboardKeyHandler = handler<KeyboardKeyEvent>
+private val mouseButtonHandler = handler<MouseButtonEvent>
+```
+
+Supports three bind actions:
+- **TOGGLE:** Press key to toggle module on/off
+- **HOLD:** Module enabled while key is held
+- **SMART:** Toggles if tapped, holds if key is held down
+
+### World Changes
+
+```kotlin
+private val handleWorldChange = sequenceHandler<WorldChangeEvent>
+```
+
+Handles delayed module enabling when joining a world. Modules enabled in configuration are activated after the player spawns.
+
+### Disconnect Handling
+
+```kotlin
+private val handleDisconnect = handler<DisconnectEvent>
+```
+
+Disables modules with `disableOnQuit = true` when disconnecting from a server.
+
+## Usage Examples
+
+### Getting and Toggling a Module
+
+```kotlin
+val killAura = ModuleManager["KillAura"]
+killAura?.enabled = true
+```
+
+### Iterating Through Modules
+
+```kotlin
+for (module in ModuleManager) {
+    if (module.category == ModuleCategories.COMBAT) {
+        println("${module.name} - ${module.enabled}")
+    }
+}
+```
+
+### Creating a Custom Module
+
+```kotlin
+val myModule = object : ClientModule(
+    name = "MyModule",
+    category = ModuleCategories.MISC
+) {
+    override fun onEnable() {
+        // Module enabled logic
+    }
+}
+
+ModuleManager.addModule(myModule)
+```
+
+## See Also
+
+- [ClientModule](/api/client-module) - Base class for all modules
+- [ModuleCategories](/api/module-categories) - Available module categories
+- [EventManager](/api/event-manager) - Event system integration

@@ -1,0 +1,426 @@
+---
+title: 'Commands'
+description: 'Understanding the command system in LiquidBounce'
+icon: 'terminal'
+---
+
+## What are Commands?
+
+Commands provide a text-based interface to interact with LiquidBounce features. They allow you to configure modules, manage settings, and perform various operations without using the GUI.
+
+<Info>
+Commands are defined in `Command.kt` and managed by `CommandManager.kt`. They support parameters, subcommands, and auto-completion.
+</Info>
+
+## Command Prefix
+
+By default, all commands start with a period (`.`). You can change this prefix in the command settings.
+
+```kotlin
+var prefix by text("Prefix", ".")
+```
+
+<Note>
+Source: `CommandManager.kt:111`
+</Note>
+
+<Tip>
+If you forget the prefix, you can always access it through the ClickGUI settings.
+</Tip>
+
+## Command Syntax
+
+Commands follow a structured syntax:
+
+```bash
+<prefix><command> [subcommand] <required_parameter> [optional_parameter]
+```
+
+### Examples
+
+```bash
+# Toggle a module
+.toggle KillAura
+
+# Add a friend with alias
+.friend add PlayerName "Best Friend"
+
+# Set a module value
+.value KillAura Range 4.2
+
+# Bind a module to a key
+.bind Flight G
+```
+
+## Command Structure
+
+Each command consists of:
+
+- **Name**: Primary identifier for the command
+- **Aliases**: Alternative names (e.g., `t` for `toggle`)
+- **Parameters**: Required or optional inputs
+- **Subcommands**: Nested commands for organization
+- **Handler**: The code that executes when the command runs
+
+```kotlin
+class Command(
+    val name: String,
+    val aliases: List<String>,
+    val parameters: List<Parameter<*>>,
+    val subcommands: List<Command>,
+    val executable: Boolean,
+    val handler: Handler?,
+    val requiresIngame: Boolean,
+)
+```
+
+<Note>
+Source: `Command.kt:43-51`
+</Note>
+
+## Built-in Commands
+
+LiquidBounce includes many built-in commands organized by category:
+
+### Client Commands
+
+<AccordionGroup>
+  <Accordion title="Module Management">
+    - **toggle** (alias: `t`) - Enable or disable a module
+    - **bind** - Bind a module to a key
+    - **binds** - List all module keybinds
+    - **hide** - Hide a module from the HUD
+    - **panic** - Quickly disable all modules
+    - **value** - Get or set module values
+  </Accordion>
+  
+  <Accordion title="Configuration">
+    - **config** - Manage configurations
+    - **localconfig** - Manage local configuration files
+    - **client** - Client settings and information
+  </Accordion>
+  
+  <Accordion title="Social">
+    - **friend** - Manage friends list
+      - `add <name> [alias]` - Add a friend
+      - `remove <name>` - Remove a friend
+      - `alias <name> <alias>` - Set friend alias
+      - `list` - Show all friends
+      - `clear` - Remove all friends
+    - **targets** - Manage target priorities
+  </Accordion>
+  
+  <Accordion title="Utility">
+    - **help** - Show available commands
+    - **clear** - Clear chat history
+    - **script** - Manage scripts
+    - **debug** - Toggle debug modes
+  </Accordion>
+</AccordionGroup>
+
+### In-Game Commands
+
+<AccordionGroup>
+  <Accordion title="Information">
+    - **ping** - Check your connection latency
+    - **tps** - Display server ticks per second
+    - **serverinfo** - Show server information
+    - **coordinates** (alias: `coords`) - Display your position
+  </Accordion>
+  
+  <Accordion title="Player Actions">
+    - **username** - Change your username display
+    - **say** - Send a chat message
+    - **fakeplayer** - Spawn a fake player for testing
+    - **remoteview** - View from another player's perspective
+  </Accordion>
+  
+  <Accordion title="Teleportation">
+    - **vclip** - Teleport vertically
+    - **teleport** - Teleport to coordinates
+    - **playerteleport** - Teleport to a player
+  </Accordion>
+  
+  <Accordion title="Creative Mode">
+    - **itemgive** - Give yourself items (creative)
+    - **itemrename** - Rename held item
+    - **itemenchant** - Enchant held item
+    - **itemskull** - Get player skulls
+    - **itemstack** - Modify item stack size
+  </Accordion>
+</AccordionGroup>
+
+### Module-Specific Commands
+
+<AccordionGroup>
+  <Accordion title="Special Modules">
+    - **xray** - Configure X-Ray block list
+    - **invsee** - View another player's inventory
+    - **autoaccount** - Manage auto-login accounts
+    - **autodisable** - Configure auto-disable conditions
+  </Accordion>
+  
+  <Accordion title="AI & Translation">
+    - **models** - Manage deep learning models
+    - **translate** - Translate messages
+    - **autotranslate** - Configure auto-translation
+  </Accordion>
+  
+  <Accordion title="Marketplace">
+    - **marketplace** - Browse and install scripts/configs
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+Source: Full command list from `CommandManager.kt:124-165`
+</Note>
+
+## Parameters
+
+Commands can accept different types of parameters:
+
+### Parameter Types
+
+- **String**: Text input (use quotes for spaces: `"Best Friend"`)
+- **Integer**: Whole numbers
+- **Float**: Decimal numbers
+- **Boolean**: true/false values
+- **Module**: Module names (with auto-completion)
+- **Player**: Player names (with auto-completion)
+- **Block**: Minecraft block types
+- **Item**: Minecraft items
+
+### Required vs Optional
+
+Parameters can be:
+- **Required**: Must be provided (shown as `<parameter>`)
+- **Optional**: Can be omitted (shown as `[parameter]`)
+- **Vararg**: Accepts multiple values
+
+```kotlin
+// Required parameter
+ParameterBuilder.module()
+    .required()
+    .build()
+
+// Optional parameter
+ParameterBuilder.begin<String>("alias")
+    .verifiedBy(ParameterBuilder.STRING_VALIDATOR)
+    .optional()
+    .build()
+```
+
+<Note>
+Source: Example from `CommandFriend.kt:194-203`
+</Note>
+
+## Auto-Completion
+
+The command system provides intelligent auto-completion:
+
+- **Command names**: Press `Tab` to see available commands
+- **Module names**: Auto-completes module names when typing
+- **Player names**: Suggests online players
+- **Subcommands**: Shows available subcommands
+- **Parameter values**: Context-aware suggestions
+
+```kotlin
+fun autoComplete(
+    builder: SuggestionsBuilder,
+    tokenizationResult: Pair<List<String>, List<Int>>,
+    commandIdx: Int,
+    isNewParameter: Boolean
+)
+```
+
+<Note>
+Source: `Command.kt:200-205`
+</Note>
+
+## Subcommands
+
+Many commands have subcommands for better organization. For example, the `friend` command:
+
+```bash
+.friend add PlayerName          # Add friend
+.friend remove PlayerName       # Remove friend
+.friend alias PlayerName "BFF"  # Set alias
+.friend list                    # List all friends
+.friend clear                   # Clear all friends
+```
+
+Subcommands are organized hierarchically:
+
+```kotlin
+val subcommandMap = Object2ObjectRBTreeMap<String, Command>(String.CASE_INSENSITIVE_ORDER)
+```
+
+<Note>
+Source: `Command.kt:71`
+</Note>
+
+## Command Execution
+
+When you execute a command:
+
+1. **Tokenization**: The input is split into command parts
+2. **Command Lookup**: The command is found in the registry
+3. **Validation**: Parameters are validated and parsed
+4. **Execution**: The command handler runs
+5. **Feedback**: Results are displayed in chat
+
+```kotlin
+fun execute(cmd: String) {
+    val args = tokenizeCommand(cmd).first
+    // Command resolution and execution...
+}
+```
+
+<Note>
+Source: `CommandManager.kt:237-363`
+</Note>
+
+## Error Handling
+
+The command system provides helpful error messages:
+
+### Unknown Command
+
+If you type an unknown command, the system suggests similar commands:
+
+```
+Unknown command: 'toggl'
+Did you mean:
+- toggle
+- t
+```
+
+The hint system uses Levenshtein distance to find similar commands:
+
+```kotlin
+val hintCount by int("HintCount", 5, 0..10)
+```
+
+<Note>
+Source: `CommandManager.kt:116`
+</Note>
+
+### Invalid Parameters
+
+Clear messages when parameters are wrong:
+- Missing required parameters
+- Invalid parameter types
+- Out-of-range values
+
+## Command Examples
+
+<CodeGroup>
+```bash Module Control
+# Toggle modules
+.toggle KillAura
+.t Velocity
+
+# Bind modules
+.bind Flight G
+.bind Speed R
+
+# Hide modules
+.hide NameTags
+```
+
+```bash Friends
+# Add friends
+.friend add Notch
+.friend add Steve "My Friend"
+
+# List friends
+.friend list
+
+# Remove friend
+.friend remove Notch
+```
+
+```bash Configuration
+# Save current config
+.config save myconfig
+
+# Load a config
+.config load pvp-settings
+
+# List configs
+.config list
+```
+
+```bash Values
+# Get module value
+.value KillAura Range
+
+# Set module value
+.value KillAura Range 4.5
+.value Speed Mode Vanilla
+```
+</CodeGroup>
+
+## Creating Custom Commands
+
+<Tip>
+You can create custom commands using the scripting system! Check out the [Scripting](/concepts/scripting) page to learn more.
+</Tip>
+
+## Command Best Practices
+
+<Steps>
+  <Step title="Use Tab Completion">
+    Press Tab while typing to see suggestions and save time
+  </Step>
+  <Step title="Learn Aliases">
+    Common commands have short aliases (`.t` instead of `.toggle`)
+  </Step>
+  <Step title="Quote Strings with Spaces">
+    Use quotes for names or aliases with spaces: `.friend add Player "Best Bud"`
+  </Step>
+  <Step title="Use Help Command">
+    Type `.help` to see all available commands and their usage
+  </Step>
+  <Step title="Check Command Feedback">
+    Read the chat messages to confirm your commands executed correctly
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Command Not Found">
+    - Check your command prefix in settings
+    - Verify the command name (use `.help` to list all commands)
+    - Make sure LiquidBounce is enabled
+  </Accordion>
+  
+  <Accordion title="Parameter Errors">
+    - Check if the parameter is required
+    - Verify parameter type (number vs. string)
+    - Use quotes for multi-word strings
+  </Accordion>
+  
+  <Accordion title="Command Not Working In-Game">
+    - Some commands require you to be in a world
+    - Check if you have the necessary permissions (creative mode for item commands)
+  </Accordion>
+</AccordionGroup>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Modules" icon="cube" href="/concepts/modules">
+    Learn about modules that commands control
+  </Card>
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Understand configuration and values
+  </Card>
+  <Card title="Scripting" icon="code" href="/concepts/scripting">
+    Create custom commands with scripts
+  </Card>
+  <Card title="ClickGUI" icon="window" href="/modules/render">
+    Alternative GUI-based control
+  </Card>
+</CardGroup>

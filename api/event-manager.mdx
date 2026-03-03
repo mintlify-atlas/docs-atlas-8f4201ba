@@ -1,0 +1,258 @@
+---
+title: "EventManager"
+description: "Fast event system for handling game events and custom events"
+---
+
+## Overview
+
+The `EventManager` is a modern, high-performance event system that handles all events in LiquidBounce. It uses lambda handlers for clean, efficient event processing and supports priority-based execution.
+
+**Package:** `net.ccbluex.liquidbounce.event`
+
+## Object Declaration
+
+```kotlin
+object EventManager
+```
+
+## Core Methods
+
+### Event Registration
+
+<ParamField path="registerEventHook()" type="fun <T : Event> registerEventHook(eventClass: Class<out Event>, eventHook: EventHook<T>): EventHook<T>">
+  Registers an event handler.
+  
+  ```kotlin
+  fun <T : Event> registerEventHook(
+      eventClass: Class<out Event>,
+      eventHook: EventHook<T>
+  ): EventHook<T>
+  ```
+  
+  Usually called through `EventListener.handler()` extension.
+</ParamField>
+
+<ParamField path="unregisterEventHook()" type="fun <T : Event> unregisterEventHook(eventClass: Class<out Event>, eventHook: EventHook<T>)">
+  Unregisters a specific event handler.
+  
+  ```kotlin
+  fun <T : Event> unregisterEventHook(
+      eventClass: Class<out Event>,
+      eventHook: EventHook<T>
+  )
+  ```
+</ParamField>
+
+<ParamField path="unregisterEventHandler()" type="fun unregisterEventHandler(eventListener: EventListener)">
+  Unregisters all handlers from an event listener.
+  
+  ```kotlin
+  fun unregisterEventHandler(eventListener: EventListener)
+  ```
+</ParamField>
+
+<ParamField path="unregisterAll()" type="fun unregisterAll()">
+  Unregisters all event handlers (dangerous!).
+  
+  ```kotlin
+  fun unregisterAll()
+  ```
+</ParamField>
+
+### Event Calling
+
+<ParamField path="callEvent()" type="fun <T : Event> callEvent(event: T): T">
+  Calls an event and notifies all registered handlers.
+  
+  ```kotlin
+  fun <T : Event> callEvent(event: T): T
+  ```
+  
+  **Example:**
+  ```kotlin
+  val event = AttackEntityEvent(entity)
+  EventManager.callEvent(event)
+  if (event.isCancelled) {
+      // Event was cancelled by handler
+  }
+  ```
+</ParamField>
+
+### Event Flows
+
+<ParamField path="eventFlow()" type="fun <T : Event> eventFlow(eventClass: Class<T>): SharedFlow<T>">
+  Gets a Kotlin Flow for the given event type.
+  
+  ```kotlin
+  fun <T : Event> eventFlow(eventClass: Class<T>): SharedFlow<T>
+  ```
+  
+  **Example:**
+  ```kotlin
+  EventManager.eventFlow(GameTickEvent::class.java).collect { event ->
+      // Handle tick event
+  }
+  ```
+</ParamField>
+
+## Event Types
+
+LiquidBounce includes many built-in event types:
+
+### Game Events
+
+- **GameTickEvent** - Called every game tick (20 times/second)
+- **GameRenderEvent** - Called when game is rendered
+- **WorldChangeEvent** - Called when world changes
+- **DisconnectEvent** - Called when disconnecting from server
+
+### Player Events
+
+- **PlayerTickEvent** - Called every player tick
+- **PlayerMoveEvent** - Called when player moves
+- **PlayerJumpEvent** - Called when player jumps
+- **AttackEntityEvent** - Called when attacking entity
+- **PlayerSafeWalkEvent** - Called to check safe walk
+
+### Network Events
+
+- **PacketEvent** - Called for sent/received packets
+- **ServerConnectEvent** - Called when connecting to server
+
+### Input Events
+
+- **KeyboardKeyEvent** - Keyboard input
+- **MouseButtonEvent** - Mouse button input
+- **MouseScrollEvent** - Mouse scroll input
+
+### Module Events
+
+- **ModuleToggleEvent** - Module enabled/disabled
+- **ModuleActivationEvent** - Module activation
+- **ValueChangedEvent** - Config value changed
+
+### Render Events
+
+- **WorldRenderEvent** - World rendering
+- **OverlayRenderEvent** - HUD/Overlay rendering
+- **ScreenRenderEvent** - GUI screen rendering
+
+### Combat Events
+
+- **TargetChangeEvent** - Combat target changed
+- **RotationUpdateEvent** - Rotation update
+
+See [Event Types](/api/event-types) for complete list.
+
+## Creating Event Handlers
+
+### Basic Handler
+
+```kotlin
+object MyFeature : EventListener {
+    private val tickHandler = handler<GameTickEvent> { event ->
+        // Called every tick
+    }
+}
+```
+
+### Handler with Priority
+
+```kotlin
+private val earlyHandler = handler<GameTickEvent>(
+    priority = EventPriorityConvention.FIRST_PRIORITY
+) { event ->
+    // Runs before other handlers
+}
+
+private val lateHandler = handler<GameTickEvent>(
+    priority = EventPriorityConvention.LAST_PRIORITY
+) { event ->
+    // Runs after other handlers
+}
+```
+
+### One-Time Handler
+
+```kotlin
+private val onceHandler = once<PlayerJumpEvent> { event ->
+    chat("Player jumped once!")
+    // Automatically unregistered after first call
+}
+```
+
+### Repeated Handler
+
+```kotlin
+private val repeatedHandler = repeated<GameTickEvent>(times = 100) { event ->
+    // Called exactly 100 times, then unregistered
+}
+```
+
+### Until Handler
+
+```kotlin
+private val untilHandler = until<GameTickEvent> { event ->
+    tickCount++
+    tickCount >= 100 // Unregisters when true
+}
+```
+
+## Event Cancellation
+
+Many events can be cancelled:
+
+```kotlin
+private val packetHandler = handler<PacketEvent> { event ->
+    if (event.packet is ClientboundPlayerPositionPacket) {
+        event.cancelEvent() // Prevent packet from being processed
+    }
+}
+```
+
+## Event Flow Usage
+
+```kotlin
+launch {
+    eventFlow<GameTickEvent>().collect { event ->
+        // Kotlin Flow-based event handling
+    }
+}
+```
+
+## Priority Convention
+
+```kotlin
+object EventPriorityConvention {
+    const val FIRST_PRIORITY: Short = 1000
+    const val SAFETY_FEATURE: Short = 900
+    const val MODEL_STATE: Short = 500
+    const val READ_FINAL_STATE: Short = -500
+    const val LAST_PRIORITY: Short = -1000
+}
+```
+
+Higher priority = runs earlier.
+
+## Performance Considerations
+
+1. **Event handlers are called frequently** - Keep them lightweight
+2. **Use appropriate priority** - Don't always use FIRST_PRIORITY
+3. **Unregister when done** - Free resources with `unregister()`
+4. **Cancel events early** - Prevent unnecessary processing
+5. **Use Flow for async** - Better for coroutine-based code
+
+## Best Practices
+
+1. **Store handlers as fields** - Prevents garbage collection
+2. **Use descriptive names** - `tickHandler`, not `handler1`
+3. **Choose correct event** - Use most specific event type
+4. **Check running state** - Handler only runs if `EventListener.running`
+5. **Handle errors** - Event errors are logged but don't crash
+6. **Use priority wisely** - Default priority works for most cases
+
+## See Also
+
+- [EventListener](/api/event-listener) - Creating event listeners
+- [Event Types](/api/event-types) - All available events
+- [ClientModule](/api/client-module) - Module event handling

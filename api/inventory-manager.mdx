@@ -1,0 +1,365 @@
+---
+title: "InventoryManager"
+description: "Manages inventory state, schedules inventory actions, and coordinates item management"
+---
+
+## Overview
+
+The `InventoryManager` handles all inventory-related operations in LiquidBounce, including tracking inventory state, scheduling actions with proper delays, and coordinating between modules that need inventory access.
+
+**Package:** `net.ccbluex.liquidbounce.utils.inventory`
+
+## Object Declaration
+
+```kotlin
+object InventoryManager : EventListener
+```
+
+## Properties
+
+<ParamField path="isInventoryOpen" type="Boolean">
+  Whether the player's inventory is open (client or server side).
+  
+  ```kotlin
+  val isInventoryOpen: Boolean
+  ```
+</ParamField>
+
+<ParamField path="isHandledScreenOpen" type="Boolean">
+  Whether any container screen is open (inventory, chest, etc.).
+  
+  ```kotlin
+  val isHandledScreenOpen: Boolean
+  ```
+</ParamField>
+
+<ParamField path="isInventoryOpenServerSide" type="Boolean">
+  Whether inventory is open on the server side.
+  
+  ```kotlin
+  var isInventoryOpenServerSide: Boolean
+      internal set
+  ```
+</ParamField>
+
+<ParamField path="lastClickedSlot" type="Int">
+  Last clicked slot index (-1 if none).
+  
+  ```kotlin
+  var lastClickedSlot: Int
+      internal set
+  ```
+</ParamField>
+
+## Inventory Actions
+
+### InventoryAction.Click
+
+```kotlin
+class Click(
+    val slot: Int,
+    val actionType: ClickType,
+    val button: Int = 0
+) : InventoryAction()
+```
+
+Clicks a slot in the inventory.
+
+<ParamField path="slot" type="Int">
+  Slot index to click
+</ParamField>
+
+<ParamField path="actionType" type="ClickType">
+  Type of click (PICKUP, QUICK_MOVE, SWAP, CLONE, THROW, etc.)
+</ParamField>
+
+<ParamField path="button" type="Int">
+  Mouse button (0 = left, 1 = right)
+</ParamField>
+
+**Example:**
+```kotlin
+// Left click on slot 36 (first hotbar slot)
+InventoryAction.Click(36, ClickType.PICKUP, 0)
+
+// Shift-click on slot
+InventoryAction.Click(slot, ClickType.QUICK_MOVE, 0)
+
+// Drop item
+InventoryAction.Click(slot, ClickType.THROW, 0)
+```
+
+### InventoryAction.Chain
+
+```kotlin
+class Chain(
+    val actions: List<InventoryAction>,
+    val inventoryConstraints: InventoryConstraints = InventoryConstraints(),
+    val priority: Int = 0
+)
+```
+
+Chains multiple inventory actions to execute sequentially.
+
+<ParamField path="actions" type="List<InventoryAction>">
+  List of actions to execute
+</ParamField>
+
+<ParamField path="inventoryConstraints" type="InventoryConstraints">
+  Timing constraints for actions
+</ParamField>
+
+<ParamField path="priority" type="Int">
+  Priority for action scheduling (higher = more important)
+</ParamField>
+
+## Inventory Constraints
+
+```kotlin
+class InventoryConstraints(
+    val startDelay: IntRange = 0..0,
+    val clickDelay: IntRange = 0..0,
+    val closeDelay: IntRange = 0..0,
+    val missChance: IntRange = 0..0
+)
+```
+
+<ParamField path="startDelay" type="IntRange">
+  Delay before first action after opening inventory (ticks)
+</ParamField>
+
+<ParamField path="clickDelay" type="IntRange">
+  Delay between clicks (ticks)
+</ParamField>
+
+<ParamField path="closeDelay" type="IntRange">
+  Delay before closing inventory (ticks)
+</ParamField>
+
+<ParamField path="missChance" type="IntRange">
+  Chance (0-100) of miss-clicking before actual action
+</ParamField>
+
+## Usage Examples
+
+### Simple Slot Click
+
+```kotlin
+val action = InventoryAction.Click(
+    slot = 36, // First hotbar slot
+    actionType = ClickType.PICKUP,
+    button = 0 // Left click
+)
+
+val chain = InventoryAction.Chain(
+    actions = listOf(action),
+    inventoryConstraints = InventoryConstraints(
+        clickDelay = 2..4 // 2-4 tick delay
+    )
+)
+
+EventManager.callEvent(ScheduleInventoryActionEvent()).schedule.add(chain)
+```
+
+### Swapping Items
+
+```kotlin
+// Swap item in slot 36 with slot 0
+val swap = InventoryAction.Chain(
+    actions = listOf(
+        InventoryAction.Click(36, ClickType.PICKUP, 0), // Pick up from slot 36
+        InventoryAction.Click(0, ClickType.PICKUP, 0),  // Place in slot 0
+        InventoryAction.Click(36, ClickType.PICKUP, 0)  // Place old item back
+    ),
+    inventoryConstraints = InventoryConstraints(
+        clickDelay = 1..3,
+        startDelay = 2..5
+    )
+)
+```
+
+### Moving Item Stack
+
+```kotlin
+// Shift-click to move entire stack
+val move = InventoryAction.Chain(
+    actions = listOf(
+        InventoryAction.Click(slot, ClickType.QUICK_MOVE, 0)
+    ),
+    inventoryConstraints = InventoryConstraints(
+        clickDelay = 2..4
+    )
+)
+```
+
+### Dropping Item
+
+```kotlin
+// Drop item from slot
+val drop = InventoryAction.Chain(
+    actions = listOf(
+        InventoryAction.Click(slot, ClickType.THROW, 0) // Drop one
+        // Or ClickType.THROW with button = 1 to drop all
+    )
+)
+```
+
+### Human-like Timing
+
+```kotlin
+val humanLike = InventoryConstraints(
+    startDelay = 3..7,    // 150-350ms delay after opening
+    clickDelay = 2..5,     // 100-250ms between clicks
+    closeDelay = 2..6,     // 100-300ms before closing
+    missChance = 5..10     // 5-10% chance of miss-click
+)
+
+val chain = InventoryAction.Chain(
+    actions = myActions,
+    inventoryConstraints = humanLike
+)
+```
+
+## Scheduling Actions
+
+```kotlin
+private val scheduleHandler = handler<ScheduleInventoryActionEvent> { event ->
+    if (shouldDoInventoryAction()) {
+        val action = createInventoryAction()
+        event.schedule.add(action)
+    }
+}
+```
+
+## Module Integration
+
+### AutoArmor Example
+
+```kotlin
+object ModuleAutoArmor : ClientModule(...) {
+    private val scheduleHandler = handler<ScheduleInventoryActionEvent> { event ->
+        val bestArmor = findBestArmor() ?: return@handler
+        
+        val actions = mutableListOf<InventoryAction>()
+        
+        // Click best armor slot
+        actions.add(InventoryAction.Click(
+            bestArmor.slot,
+            ClickType.QUICK_MOVE,
+            0
+        ))
+        
+        val chain = InventoryAction.Chain(
+            actions = actions,
+            inventoryConstraints = InventoryConstraints(
+                startDelay = startDelay.random(),
+                clickDelay = clickDelay.random(),
+                closeDelay = closeDelay.random()
+            ),
+            priority = 100 // High priority for armor
+        )
+        
+        event.schedule.add(chain)
+    }
+}
+```
+
+### ChestStealer Example
+
+```kotlin
+object ModuleChestStealer : ClientModule(...) {
+    private val scheduleHandler = handler<ScheduleInventoryActionEvent> { event ->
+        val chest = mc.screen as? ChestScreen ?: return@handler
+        
+        val actions = mutableListOf<InventoryAction>()
+        
+        // Find valuable items in chest
+        for (slot in 0 until chest.menu.slots.size) {
+            val stack = chest.menu.getSlot(slot).item
+            if (isValuable(stack)) {
+                actions.add(InventoryAction.Click(
+                    slot,
+                    ClickType.QUICK_MOVE,
+                    0
+                ))
+            }
+        }
+        
+        if (actions.isEmpty()) {
+            // Close chest when done
+            actions.add(InventoryAction.CloseScreen())
+        }
+        
+        val chain = InventoryAction.Chain(
+            actions = actions,
+            inventoryConstraints = InventoryConstraints(
+                clickDelay = stealDelay.random()
+            )
+        )
+        
+        event.schedule.add(chain)
+    }
+}
+```
+
+### InventoryCleaner Example
+
+```kotlin
+object ModuleInventoryCleaner : ClientModule(...) {
+    private val scheduleHandler = handler<ScheduleInventoryActionEvent> { event ->
+        val trashSlot = findTrashItem() ?: return@handler
+        
+        val chain = InventoryAction.Chain(
+            actions = listOf(
+                InventoryAction.Click(
+                    trashSlot,
+                    ClickType.THROW,
+                    1 // Drop all
+                )
+            ),
+            inventoryConstraints = InventoryConstraints(
+                clickDelay = delay.random()
+            )
+        )
+        
+        event.schedule.add(chain)
+    }
+}
+```
+
+## Priority System
+
+Actions are processed in priority order:
+
+1. **Non-inventory actions** (don't require inventory open)
+2. **High priority** (armor, critical items)
+3. **Normal priority** (general inventory management)
+4. **Low priority** (cleanup, sorting)
+
+## Best Practices
+
+1. **Use appropriate delays** - Mimic human timing
+2. **Set correct priority** - Critical actions should have high priority
+3. **Check inventory state** - Use `isInventoryOpen` before scheduling
+4. **Handle conflicts** - Multiple modules may want inventory access
+5. **Add miss-clicks** - More human-like behavior
+6. **Close inventory when done** - Add CloseScreen action
+7. **Check container type** - Different containers have different slot layouts
+
+## Slot Indices
+
+### Player Inventory
+- **0-8:** Hotbar slots
+- **9-35:** Main inventory
+- **36-39:** Armor slots (feet, legs, chest, head)
+- **40:** Offhand
+
+### Container Screens
+- **0-26:** Container slots (chest, etc.)
+- **27+:** Player inventory slots
+
+## See Also
+
+- [CombatManager](/api/combat-manager) - Combat coordination
+- [RotationManager](/api/rotation-manager) - Rotation management
+- [ClientModule](/api/client-module) - Module implementation

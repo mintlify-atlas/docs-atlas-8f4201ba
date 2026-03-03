@@ -1,0 +1,331 @@
+---
+title: Cosmetics
+description: Customize your appearance with capes and other cosmetic items
+icon: wand-sparkles
+---
+
+# Cosmetics
+
+LiquidBounce features a cosmetics system that allows users to display capes and other visual customizations. The system is designed to be efficient, reducing API stress while providing reliable cosmetic loading.
+
+## Overview
+
+The cosmetics system consists of three main components:
+
+<CardGroup cols={3}>
+  <Card title="CosmeticService" icon="server">
+    Manages cosmetic carriers and fetching
+  </Card>
+  <Card title="CapeCosmeticsManager" icon="image">
+    Handles cape texture loading and caching
+  </Card>
+  <Card title="ClientAccountManager" icon="user">
+    Manages authenticated client account
+  </Card>
+</CardGroup>
+
+## Cosmetic Service
+
+The `CosmeticService` implements a carrier-based system to reduce API load:
+
+```kotlin
+object CosmeticService : EventListener, ValueGroup("Cosmetics") {
+    // Collection of MD5-hashed UUIDs of players with cosmetics
+    internal var carriers = emptySet<String>()
+    
+    // Cache of fetched cosmetics per UUID
+    internal val carriersCosmetics = hashMapOf<UUID, Set<Cosmetic>>()
+}
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Carrier List">
+    Maintains a set of MD5-hashed UUIDs of all players who have cosmetics
+  </Step>
+  <Step title="Lazy Loading">
+    Only fetches cosmetics when a player with cosmetics is encountered
+  </Step>
+  <Step title="Caching">
+    Caches fetched cosmetics to avoid repeated API calls
+  </Step>
+  <Step title="Periodic Refresh">
+    Updates the carrier list every 60 seconds
+  </Step>
+</Steps>
+
+<Info>
+This approach significantly reduces API stress compared to checking every player individually.
+</Info>
+
+## Cosmetic Categories
+
+Cosmetics are categorized by type:
+
+```kotlin
+enum class CosmeticCategory {
+    CAPE,
+    // Future categories can be added here
+}
+```
+
+Currently, only **capes** are supported, but the system is designed to be extensible.
+
+## Fetching Cosmetics
+
+Fetch a cosmetic for a specific player:
+
+```kotlin
+CosmeticService.fetchCosmetic(uuid, category) { cosmetic ->
+    // Use the cosmetic
+}
+```
+
+The fetch process (from CosmeticService.kt:99):
+
+1. **Check if Local Client**
+   ```kotlin
+   if (uuid == mc.user.profileId || uuid == mc.player?.uuid) {
+       // Use client account cosmetics
+       clientAccount.cosmetics?.let { cosmetics ->
+           done(cosmetics.find { it.category == category } ?: return)
+       }
+   }
+   ```
+
+2. **Refresh Carrier List**
+   ```kotlin
+   refreshCarriers {
+       if (uuid.toMD5() !in carriers) {
+           return@refreshCarriers  // Player has no cosmetics
+       }
+   }
+   ```
+
+3. **Check Cache**
+   ```kotlin
+   carriersCosmetics[uuid]?.let { cosmetics ->
+       done(cosmetics.find { it.category == category } ?: return)
+   }
+   ```
+
+4. **Fetch from API**
+   ```kotlin
+   val cosmetics = CosmeticApi.getCarrierCosmetics(uuid)
+   carriersCosmetics[uuid] = cosmetics
+   done(cosmetics.find { it.category == category } ?: return)
+   ```
+
+## Carrier Refresh
+
+The carrier list is refreshed periodically:
+
+```kotlin
+fun refreshCarriers(force: Boolean = false, done: () -> Unit) {
+    // Only refresh if 60 seconds elapsed or forced
+    if (lastUpdate.hasElapsed(REFRESH_DELAY) || force) {
+        task = withScope {
+            carriers = CosmeticApi.getCarriers()
+            lastUpdate.reset()
+            mc.execute(done)
+        }
+    } else {
+        done()  // No refresh needed
+    }
+}
+```
+
+<Note>
+Refresh operations use a task lock to prevent concurrent refreshes.
+</Note>
+
+## Cape System
+
+The `CapeCosmeticsManager` handles cape-specific functionality:
+
+### Loading Player Capes
+
+```kotlin
+fun loadPlayerCape(player: GameProfile, callback: Consumer<Identifier>) {
+    CosmeticService.fetchCosmetic(player.id, CosmeticCategory.CAPE) { cosmetic ->
+        val name = getCapeName(cosmetic) ?: return@fetchCosmetic
+        
+        // Check cache
+        cachedCapes[name]?.let { capeId ->
+            callback.accept(capeId)
+            return@fetchCosmetic
+        }
+        
+        // Download cape texture
+        val texture = CapeApi.getCape(name)
+        val id = LiquidBounce.identifier("cape-$name")
+        
+        // Register and cache
+        texture.registerTexture(id)
+        cachedCapes[name] = id
+        callback.accept(id)
+    }
+}
+```
+
+### Cape Caching
+
+Capes are cached in memory to avoid repeated downloads:
+
+```kotlin
+private val cachedCapes = hashMapOf<String, Identifier>()
+```
+
+The cache is automatically cleared on disconnect:
+
+```kotlin
+private val disconnectHandler = handler<DisconnectEvent> {
+    cachedCapes.values.forEach { mc.textureManager.release(it) }
+    cachedCapes.clear()
+}
+```
+
+<Info>
+Capes are cached by name, not UUID, allowing multiple players with the same cape to share textures.
+</Info>
+
+## Client Account Integration
+
+For the authenticated client, cosmetics are managed through `ClientAccountManager`:
+
+```kotlin
+object ClientAccountManager : Config("account") {
+    var clientAccount by value(
+        "account",
+        ClientAccount.ENV_ACCOUNT ?: ClientAccount.EMPTY_ACCOUNT
+    )
+}
+```
+
+The client account includes:
+- User information
+- Owned cosmetics
+- Session tokens
+
+### Updating Client Cosmetics
+
+```kotlin
+clientAccount.updateCosmetics()
+```
+
+This fetches the latest cosmetics for the authenticated user.
+
+## Temporary Ownership Transfer
+
+Cosmetics can be temporarily transferred to another UUID:
+
+```kotlin
+private suspend fun transferTemporaryOwnership(uuid: UUID) {
+    clientAccount.transferTemporaryOwnership(uuid)
+    
+    // Refresh carrier list after transfer
+    refreshCarriers(true) {
+        logger.info("Successfully loaded ${carriers.size} cosmetics carriers.")
+    }
+}
+```
+
+This is automatically triggered on session changes:
+
+```kotlin
+private val sessionHandler = suspendHandler<SessionEvent> {
+    val uuid = it.session.profileId
+    transferTemporaryOwnership(uuid)
+}
+```
+
+## Checking Cosmetic Availability
+
+Check if a player has a specific cosmetic:
+
+```kotlin
+if (CosmeticService.hasCosmetic(uuid, CosmeticCategory.CAPE)) {
+    // Player has a cape
+}
+```
+
+This performs a non-blocking check using cached data.
+
+## Performance Optimizations
+
+<AccordionGroup>
+  <Accordion title="MD5 Hashing">
+    Player UUIDs are MD5-hashed in the carrier set to reduce memory usage and improve lookup performance.
+    
+    ```kotlin
+    if (uuid.toMD5() !in carriers) {
+        return  // No cosmetics
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Pre-allocation">
+    Empty sets are pre-allocated to prevent multiple concurrent requests for the same cosmetic.
+    
+    ```kotlin
+    // Pre-allocate to prevent multiple requests
+    carriersCosmetics[uuid] = emptySet()
+    ```
+  </Accordion>
+  
+  <Accordion title="Lazy Loading">
+    Cosmetics are only fetched when needed, not preloaded for all players.
+  </Accordion>
+  
+  <Accordion title="Cache Cleanup">
+    Caches are cleared on disconnect to prevent memory leaks.
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling
+
+All API calls use `runCatching` for robust error handling:
+
+```kotlin
+runCatching {
+    val cosmetics = CosmeticApi.getCarrierCosmetics(uuid)
+    carriersCosmetics[uuid] = cosmetics
+}.onFailure {
+    logger.error("Failed to get cosmetics of carrier $uuid", it)
+}
+```
+
+## Code References
+
+<CardGroup cols={2}>
+  <Card title="CosmeticService.kt" icon="server">
+    Core cosmetic service - line 51
+    <br/>`features/cosmetic/CosmeticService.kt`
+  </Card>
+  <Card title="CapeCosmeticsManager.kt" icon="image">
+    Cape loading and caching - line 42
+    <br/>`features/cosmetic/CapeCosmeticsManager.kt`
+  </Card>
+  <Card title="ClientAccountManager.kt" icon="user">
+    Client account management - line 25
+    <br/>`features/cosmetic/ClientAccountManager.kt`
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use Callbacks">
+    Always use callbacks when fetching cosmetics as operations are asynchronous
+  </Step>
+  <Step title="Check Carriers First">
+    The carrier set provides a fast pre-check before fetching cosmetics
+  </Step>
+  <Step title="Handle Missing Cosmetics">
+    Not all players have cosmetics - handle null/empty results gracefully
+  </Step>
+  <Step title="Respect Cache">
+    Don't force refresh unless necessary - trust the 60-second refresh cycle
+  </Step>
+</Steps>

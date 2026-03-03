@@ -1,0 +1,581 @@
+---
+title: Development Guide
+description: Setting up a development environment and contributing to LiquidBounce
+icon: code
+---
+
+Complete guide for setting up a LiquidBounce development workspace, building from source, and contributing to the project.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+<CardGroup cols={3}>
+  <Card title="Java Development Kit" icon="java">
+    JDK 17 or higher
+  </Card>
+  
+  <Card title="Git" icon="git">
+    For cloning the repository
+  </Card>
+  
+  <Card title="Node.js" icon="node">
+    Required for theme development
+  </Card>
+</CardGroup>
+
+<Info>
+  Gradle is included via the wrapper, so you don't need to install it separately.
+</Info>
+
+## Initial Setup
+
+<Steps>
+  <Step title="Clone Repository">
+    Clone the repository with submodules:
+    
+    ```bash
+    git clone --recurse-submodules https://github.com/CCBlueX/LiquidBounce
+    ```
+    
+    <Warning>
+      The `--recurse-submodules` flag is important! The theme is in a submodule.
+    </Warning>
+  </Step>
+  
+  <Step title="Navigate to Directory">
+    ```bash
+    cd LiquidBounce
+    ```
+  </Step>
+  
+  <Step title="Generate Sources (Optional)">
+    Generate Minecraft sources for better IDE experience:
+    
+    ```bash
+    ./gradlew genSources
+    ```
+    
+    <Tip>
+      This step is optional but highly recommended for code navigation and debugging.
+    </Tip>
+  </Step>
+  
+  <Step title="Open in IDE">
+    Open the folder as a Gradle project in your preferred IDE (IntelliJ IDEA recommended).
+  </Step>
+</Steps>
+
+## Running the Client
+
+### Development Mode
+
+Run the client directly from your IDE or terminal:
+
+<CodeGroup>
+```bash Terminal
+./gradlew runClient
+```
+
+```bash Windows
+.\gradlew.bat runClient
+```
+</CodeGroup>
+
+### Run Configurations
+
+<Tabs>
+  <Tab title="IntelliJ IDEA">
+    1. Gradle should auto-create run configurations
+    2. Look for "Minecraft Client" in the run configurations dropdown
+    3. Click the play button to launch
+  </Tab>
+  
+  <Tab title="VS Code">
+    1. Install the Java Extension Pack
+    2. Use the Gradle tasks view
+    3. Navigate to `fabric` > `runClient`
+  </Tab>
+  
+  <Tab title="Eclipse">
+    1. Import as Gradle project
+    2. Run `./gradlew eclipse` to generate Eclipse configs
+    3. Use Gradle Tasks view to run `runClient`
+  </Tab>
+</Tabs>
+
+## Building from Source
+
+### Production Build
+
+Build the final JAR file:
+
+```bash
+./gradlew build
+```
+
+The built JAR will be located at:
+```
+build/libs/liquidbounce-<version>.jar
+```
+
+### Build Variants
+
+<CodeGroup>
+```bash Clean Build
+./gradlew clean build
+```
+
+```bash Quick Build (Skip Tests)
+./gradlew build -x test
+```
+
+```bash Rebuild
+./gradlew clean build --refresh-dependencies
+```
+</CodeGroup>
+
+## Gradle Tasks
+
+### Common Tasks
+
+<AccordionGroup>
+  <Accordion title="runClient" icon="play">
+    Runs the Minecraft client with LiquidBounce in development mode.
+    ```bash
+    ./gradlew runClient
+    ```
+  </Accordion>
+  
+  <Accordion title="build" icon="hammer">
+    Compiles the project and creates the JAR file.
+    ```bash
+    ./gradlew build
+    ```
+  </Accordion>
+  
+  <Accordion title="clean" icon="broom">
+    Removes all build artifacts.
+    ```bash
+    ./gradlew clean
+    ```
+  </Accordion>
+  
+  <Accordion title="genSources" icon="file-code">
+    Generates decompiled Minecraft source code for reference.
+    ```bash
+    ./gradlew genSources
+    ```
+  </Accordion>
+  
+  <Accordion title="test" icon="vial">
+    Runs the test suite.
+    ```bash
+    ./gradlew test
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Theme Tasks
+
+The theme is built using Node.js:
+
+```bash
+cd src-theme
+npm install
+npm run build
+```
+
+## Mixin Development
+
+LiquidBounce uses Mixins to inject code into Minecraft classes.
+
+### What are Mixins?
+
+<Info>
+  Mixins allow you to modify Minecraft's code at runtime without directly editing Mojang's copyrighted source code.
+</Info>
+
+### Creating a Mixin
+
+<Steps>
+  <Step title="Create Mixin Class">
+    Create a new Kotlin class in the mixins package:
+    
+    ```kotlin
+    package net.ccbluex.liquidbounce.injection.mixins.minecraft.client
+    
+    import net.minecraft.client.Minecraft
+    import org.spongepowered.asm.mixin.Mixin
+    import org.spongepowered.asm.mixin.injection.At
+    import org.spongepowered.asm.mixin.injection.Inject
+    import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
+    
+    @Mixin(Minecraft::class)
+    class MixinMinecraft {
+        
+        @Inject(method = ["tick"], at = [At("HEAD")])
+        private fun onTick(ci: CallbackInfo) {
+            // Your code here
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Register Mixin">
+    Add your mixin to `liquidbounce.mixins.json`:
+    
+    ```json
+    {
+      "mixins": [
+        "minecraft.client.MixinMinecraft"
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Test Changes">
+    Run the client to test your mixin:
+    ```bash
+    ./gradlew runClient
+    ```
+  </Step>
+</Steps>
+
+### Mixin Injection Points
+
+<ResponseField name="@Inject" type="annotation">
+  Inject code at a specific point in a method
+  
+  ```kotlin
+  @Inject(method = ["methodName"], at = [At("HEAD")])
+  ```
+</ResponseField>
+
+<ResponseField name="@ModifyVariable" type="annotation">
+  Modify a local variable's value
+  
+  ```kotlin
+  @ModifyVariable(method = ["methodName"], at = [At("STORE")])
+  ```
+</ResponseField>
+
+<ResponseField name="@Redirect" type="annotation">
+  Redirect a method call to your own implementation
+  
+  ```kotlin
+  @Redirect(method = ["methodName"], at = [At(value = "INVOKE", target = "...")])
+  ```
+</ResponseField>
+
+<ResponseField name="@ModifyConstant" type="annotation">
+  Modify constant values
+  
+  ```kotlin
+  @ModifyConstant(method = ["methodName"], constant = [Constant(intValue = 20)])
+  ```
+</ResponseField>
+
+### Common Injection Patterns
+
+<Tabs>
+  <Tab title="Method Entry">
+    ```kotlin
+    @Inject(method = ["tick"], at = [At("HEAD")])
+    private fun onTickStart(ci: CallbackInfo) {
+        // Runs at the start of the tick method
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Method Exit">
+    ```kotlin
+    @Inject(method = ["tick"], at = [At("RETURN")])
+    private fun onTickEnd(ci: CallbackInfo) {
+        // Runs before the method returns
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Cancellable">
+    ```kotlin
+    @Inject(method = ["tick"], at = [At("HEAD")], cancellable = true)
+    private fun onTick(ci: CallbackInfo) {
+        if (shouldCancel()) {
+            ci.cancel()
+        }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Method Call">
+    ```kotlin
+    @Inject(
+        method = ["render"],
+        at = [At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/GameRenderer;render(F)V"
+        )]
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Mixin Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Descriptive Names" icon="signature">
+    Name mixins after the class they modify: `MixinMinecraft`
+  </Card>
+  
+  <Card title="Minimize Injections" icon="minimize">
+    Only inject where absolutely necessary
+  </Card>
+  
+  <Card title="Document Purpose" icon="comment">
+    Add comments explaining why the mixin exists
+  </Card>
+  
+  <Card title="Test Thoroughly" icon="vial-circle-check">
+    Test mixins with different game states
+  </Card>
+</CardGroup>
+
+<Warning>
+  Mixins run at very low level. Bugs in mixins can crash Minecraft or cause unexpected behavior.
+</Warning>
+
+## Contributing
+
+We welcome contributions to LiquidBounce!
+
+### Contribution Workflow
+
+<Steps>
+  <Step title="Fork the Repository">
+    Create a fork of LiquidBounce on GitHub.
+  </Step>
+  
+  <Step title="Create a Branch">
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+  </Step>
+  
+  <Step title="Make Changes">
+    Implement your feature or fix.
+  </Step>
+  
+  <Step title="Test Thoroughly">
+    Ensure your changes work and don't break existing functionality.
+  </Step>
+  
+  <Step title="Commit Changes">
+    ```bash
+    git add .
+    git commit -m "Add: Your feature description"
+    ```
+  </Step>
+  
+  <Step title="Push to Fork">
+    ```bash
+    git push origin feature/your-feature-name
+    ```
+  </Step>
+  
+  <Step title="Create Pull Request">
+    Open a pull request on the main repository with a clear description.
+  </Step>
+</Steps>
+
+### Code Style Guidelines
+
+<AccordionGroup>
+  <Accordion title="Kotlin Conventions" icon="k">
+    - Follow Kotlin coding conventions
+    - Use 4 spaces for indentation
+    - Maximum line length: 120 characters
+    - Use meaningful variable names
+  </Accordion>
+  
+  <Accordion title="Comments" icon="message">
+    - Document public APIs with KDoc
+    - Explain complex logic with inline comments
+    - Keep comments up-to-date with code changes
+  </Accordion>
+  
+  <Accordion title="File Organization" icon="folder-tree">
+    - Place files in appropriate packages
+    - Keep related code together
+    - Avoid circular dependencies
+  </Accordion>
+  
+  <Accordion title="Naming" icon="tag">
+    - Classes: PascalCase (e.g., `ModuleKillAura`)
+    - Functions: camelCase (e.g., `attackEntity`)
+    - Constants: SCREAMING_SNAKE_CASE (e.g., `MAX_DISTANCE`)
+  </Accordion>
+</AccordionGroup>
+
+### Pull Request Guidelines
+
+<Check>One feature or fix per PR</Check>
+<Check>Clear and descriptive title</Check>
+<Check>Detailed description of changes</Check>
+<Check>Screenshots/videos for UI changes</Check>
+<Check>All tests passing</Check>
+<Check>No merge conflicts</Check>
+
+## License Compliance
+
+<Warning>
+  LiquidBounce is licensed under GPL v3.0. Any code you contribute must be compatible with this license.
+</Warning>
+
+### GPL v3.0 Requirements
+
+<Steps>
+  <Step title="Use GPL-Compatible Code">
+    Only use code that is GPL-compatible or public domain.
+  </Step>
+  
+  <Step title="Disclose Source">
+    If you distribute LiquidBounce (or forks), you must provide source code.
+  </Step>
+  
+  <Step title="License Derivatives">
+    Any modifications must also be licensed under GPL v3.0.
+  </Step>
+  
+  <Step title="Preserve Notices">
+    Keep all license headers and copyright notices intact.
+  </Step>
+</Steps>
+
+<Info>
+  For full license details, see the [GPL v3.0 license](https://www.gnu.org/licenses/gpl-3.0.en.html).
+</Info>
+
+## Project Structure
+
+```
+LiquidBounce/
+├── src/
+│   └── main/
+│       ├── kotlin/
+│       │   └── net/ccbluex/liquidbounce/
+│       │       ├── config/          # Configuration system
+│       │       ├── deeplearn/       # AI/ML features
+│       │       ├── event/           # Event system
+│       │       ├── features/        # Core features
+│       │       │   ├── module/      # Modules (hacks)
+│       │       │   └── spoofer/     # Spoofers
+│       │       ├── integration/     # Browser & integrations
+│       │       └── utils/           # Utility classes
+│       ├── resources/
+│       │   └── liquidbounce.mixins.json
+│       └── java/                    # Java sources (mixins)
+├── src-theme/                       # Web-based theme (submodule)
+├── build.gradle.kts                 # Build configuration
+└── gradle/                          # Gradle wrapper
+```
+
+## Debugging
+
+### IntelliJ IDEA Debugger
+
+<Steps>
+  <Step title="Set Breakpoints">
+    Click in the gutter next to line numbers to set breakpoints.
+  </Step>
+  
+  <Step title="Debug Mode">
+    Click the debug icon (bug) instead of run.
+  </Step>
+  
+  <Step title="Inspect Variables">
+    Hover over variables or use the Variables panel.
+  </Step>
+  
+  <Step title="Step Through Code">
+    Use F8 (step over), F7 (step into), Shift+F8 (step out).
+  </Step>
+</Steps>
+
+### Remote Debugging
+
+For debugging in production:
+
+```bash
+./gradlew runClient --debug-jvm
+```
+
+Then attach a remote debugger on port 5005.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Gradle build fails">
+    1. Try `./gradlew clean build --refresh-dependencies`
+    2. Check you're using JDK 17 or higher
+    3. Ensure internet connection for dependency downloads
+  </Accordion>
+  
+  <Accordion title="Client won't start">
+    1. Check the run configuration is correct
+    2. Look for errors in the IDE console
+    3. Try regenerating sources: `./gradlew genSources`
+  </Accordion>
+  
+  <Accordion title="Mixin not applying">
+    1. Verify the mixin is registered in `liquidbounce.mixins.json`
+    2. Check the target class/method names are correct
+    3. Look for mixin errors in the log
+  </Accordion>
+  
+  <Accordion title="Theme not building">
+    1. Ensure Node.js is installed
+    2. Run `npm install` in `src-theme/`
+    3. Check for errors in theme build output
+  </Accordion>
+</AccordionGroup>
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="Mixin Documentation" icon="book" href="https://docs.spongepowered.org/5.1.0/en/plugin/internals/mixins.html">
+    Official Mixin framework documentation
+  </Card>
+  
+  <Card title="Fabric Wiki" icon="scroll" href="https://fabricmc.net/wiki/">
+    Fabric modding documentation
+  </Card>
+  
+  <Card title="Kotlin Docs" icon="k" href="https://kotlinlang.org/docs/home.html">
+    Official Kotlin documentation
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/CCBlueX/LiquidBounce/issues">
+    Report bugs and request features
+  </Card>
+</CardGroup>
+
+## Community
+
+<CardGroup cols={3}>
+  <Card title="Discord" icon="discord" href="https://liquidbounce.net/discord">
+    Join our Discord server
+  </Card>
+  
+  <Card title="Forum" icon="comments" href="https://forums.ccbluex.net">
+    Community forums
+  </Card>
+  
+  <Card title="YouTube" icon="youtube" href="https://youtube.com/CCBlueX">
+    Video tutorials and updates
+  </Card>
+</CardGroup>
+
+<Tip>
+  For quick questions, join our Discord server. For bug reports and feature requests, use GitHub Issues.
+</Tip>

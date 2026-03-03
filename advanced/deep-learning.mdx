@@ -1,0 +1,436 @@
+---
+title: Deep Learning Integration
+description: AI-powered features using Deep Java Library (DJL) and PyTorch
+icon: brain
+---
+
+LiquidBounce integrates deep learning capabilities through the Deep Java Library (DJL) framework, enabling AI-powered combat features and adaptive behavior.
+
+## Overview
+
+The deep learning system provides:
+- AI-powered combat prediction and aim assistance
+- Neural network model management
+- Training capabilities for custom models
+- PyTorch backend integration
+- CPU-optimized inference
+
+## Architecture
+
+### DeepLearningEngine
+
+The core engine manages DJL initialization and model storage (`DeepLearningEngine.kt:31`).
+
+<CodeGroup>
+```kotlin Initialization
+suspend fun init(task: Task) {
+    this.task = task
+    
+    logger.info("Initializing engine...")
+    val engine = withContext(Dispatchers.IO) {
+        Engine.getInstance()
+    }
+    val name = engine.engineName
+    val version = engine.version
+    val deviceType = engine.defaultDevice().deviceType
+    logger.info("Using deep learning engine $name $version on $deviceType.")
+    
+    isInitialized = true
+    this.task = null
+}
+```
+
+```kotlin Configuration
+init {
+    System.setProperty("DJL_CACHE_DIR", djlCacheFolder.absolutePath)
+    System.setProperty("ENGINE_CACHE_DIR", enginesCacheFolder.absolutePath)
+    
+    // Disable tracking of DJL
+    System.setProperty("OPT_OUT_TRACKING", "true")
+    
+    // Set the default engine to PyTorch
+    System.setProperty("DJL_DEFAULT_ENGINE", "PyTorch")
+    // Enforce CPU pytorch flavor
+    System.setProperty("PYTORCH_FLAVOR", "cpu")
+}
+```
+</CodeGroup>
+
+### Directory Structure
+
+The engine maintains organized directories:
+
+<ResponseField name="deeplearning/" type="directory">
+  Root directory for all AI-related files
+  
+  <Expandable title="Subdirectories">
+    <ResponseField name="djl/" type="directory">
+      DJL framework cache
+    </ResponseField>
+    
+    <ResponseField name="engines/" type="directory">
+      PyTorch engine libraries
+    </ResponseField>
+    
+    <ResponseField name="models/" type="directory">
+      Trained model files
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Model Manager
+
+The ModelManager handles loading, training, and managing AI models (`ModelManager.kt:33`).
+
+### Base Models
+
+Pre-trained combat models included with LiquidBounce:
+
+```kotlin
+val combatModels = arrayOf(
+    "21KC11KP",  // 1.21 KillAura Combat (11K Parameters)
+    "19KC8KP"    // 1.19 KillAura Combat (8K Parameters)
+)
+```
+
+### Loading Models
+
+<Steps>
+  <Step title="Scan Available Models">
+    Searches the models folder for custom trained models
+  </Step>
+  
+  <Step title="Load Base Models">
+    Loads embedded models from resources
+  </Step>
+  
+  <Step title="Initialize Each Model">
+    Creates model instances with proper translators
+  </Step>
+  
+  <Step title="Sync GUI">
+    Updates the ClickGUI with available models
+  </Step>
+</Steps>
+
+```kotlin
+fun load() {
+    logger.info("Loading models...")
+    val choices = allCombatModels.mapToArray { name ->
+        TwoDimensionalRegressionModel(name, models)
+    }
+    
+    for (model in choices) {
+        runCatching {
+            measureTime {
+                model.load()
+            }
+        }.onFailure { error ->
+            logger.error("Failed to load model '${model.name}'.", error)
+        }.onSuccess { time ->
+            logger.info("Loaded model '${model.name}' in ${time.inWholeMilliseconds}ms.")
+        }
+    }
+}
+```
+
+## Model Architecture
+
+### Multi-Layer Perceptron (MLP)
+
+Models use a standard MLP architecture (`ModelWrapper.kt:146`):
+
+<Steps>
+  <Step title="Input Layer">
+    128 units with Xavier initialization
+  </Step>
+  
+  <Step title="Hidden Layer 1">
+    64 units with Batch Normalization and ReLU activation
+  </Step>
+  
+  <Step title="Hidden Layer 2">
+    32 units with Batch Normalization and ReLU activation
+  </Step>
+  
+  <Step title="Output Layer">
+    Variable units based on task (2 for 2D regression)
+  </Step>
+</Steps>
+
+```kotlin
+private fun createMlpBlock(outputs: Long) = SequentialBlock()
+    .add(Linear.builder().setUnits(128).build())
+    .add(Blocks.batchFlattenBlock())
+    .add(BatchNorm.builder().build())
+    .add(Activation.reluBlock())
+    
+    .add(Linear.builder().setUnits(64).build())
+    .add(Blocks.batchFlattenBlock())
+    .add(BatchNorm.builder().build())
+    .add(Activation.reluBlock())
+    
+    .add(Linear.builder().setUnits(32).build())
+    .add(Blocks.batchFlattenBlock())
+    .add(BatchNorm.builder().build())
+    .add(Activation.reluBlock())
+    
+    .add(Linear.builder().setUnits(outputs).build())
+```
+
+## Making Predictions
+
+### 2D Regression Model
+
+Used for aim prediction and targeting (`TwoDimensionalRegressionModel.kt:24`):
+
+```kotlin
+class TwoDimensionalRegressionModel(
+    name: String,
+    parent: ModeValueGroup<*>
+) : ModelWrapper<FloatArray, FloatArray>(
+    name,
+    FloatArrayInAndOutTranslator(),
+    2, // X, Y outputs
+    parent
+)
+```
+
+### Prediction API
+
+```kotlin
+@Throws(TranslateException::class)
+fun predict(input: I): O {
+    require(DeepLearningEngine.isInitialized) { 
+        "DeepLearningEngine is not initialized" 
+    }
+    
+    return predictor.predict(input)
+}
+```
+
+<CodeGroup>
+```kotlin Example Usage
+// Get active model
+val model = ModelManager.models.activeMode
+
+// Prepare input features
+val input = floatArrayOf(playerX, playerY)
+
+// Make prediction
+val output = model.predict(input)
+val targetX = output[0]
+val targetY = output[1]
+```
+
+```kotlin Error Handling
+try {
+    val prediction = model.predict(features)
+    applyPrediction(prediction)
+} catch (e: TranslateException) {
+    logger.error("Prediction failed", e)
+}
+```
+</CodeGroup>
+
+## Training Models
+
+### Training Configuration
+
+```kotlin
+fun train(features: Array<FloatArray>, labels: Array<FloatArray>) {
+    require(features.size == labels.size) { 
+        "Features and labels must have the same size" 
+    }
+    require(features.isNotEmpty()) { 
+        "Features and labels must not be empty" 
+    }
+    
+    val trainingConfig = DefaultTrainingConfig(Loss.l2Loss())
+        .optInitializer(XavierInitializer(), "weight")
+        .optOptimizer(
+            Adam.builder()
+                .optLearningRateTracker(Tracker.fixed(0.001f))
+                .build()
+        )
+        .addTrainingListeners(
+            LoggingTrainingListener(), 
+            OverlayTrainingListener(NUM_EPOCH)
+        )
+}
+```
+
+### Training Parameters
+
+<ParamField path="NUM_EPOCH" type="int" default="100">
+  Number of training epochs
+</ParamField>
+
+<ParamField path="BATCH_SIZE" type="int" default="32">
+  Batch size for training
+</ParamField>
+
+<ParamField path="learning_rate" type="float" default="0.001">
+  Adam optimizer learning rate
+</ParamField>
+
+<ParamField path="loss" type="Loss" default="L2Loss">
+  Mean squared error loss function
+</ParamField>
+
+## Model Persistence
+
+### Saving Models
+
+```kotlin
+// Save to models folder with default name
+model.save()
+
+// Save with custom name
+model.save("my-custom-model")
+
+// Save to specific path
+model.save(Path.of("/custom/path/model"))
+```
+
+### Loading Models
+
+<Tabs>
+  <Tab title="From Folder">
+    ```kotlin
+    // Load from models folder
+    model.load("custom-model")
+    ```
+  </Tab>
+  
+  <Tab title="From Path">
+    ```kotlin
+    // Load from specific path
+    model.load(Path.of("/custom/path/model"))
+    ```
+  </Tab>
+  
+  <Tab title="From Stream">
+    ```kotlin
+    // Load from input stream
+    val stream = getModelStream()
+    model.load(stream)
+    ```
+  </Tab>
+  
+  <Tab title="From Resources">
+    ```kotlin
+    // Load embedded resource (automatic fallback)
+    model.load() // Uses lowercase name
+    ```
+  </Tab>
+</Tabs>
+
+## Performance Optimization
+
+### CPU-Only Configuration
+
+<Info>
+  LiquidBounce uses CPU-optimized PyTorch to avoid CUDA conflicts and reduce download size.
+</Info>
+
+```kotlin
+// Enforce CPU pytorch flavor
+System.setProperty("PYTORCH_FLAVOR", "cpu")
+```
+
+### Resource Management
+
+All models implement `Closeable` for proper resource cleanup:
+
+```kotlin
+override fun close() {
+    predictor.close()
+    model.close()
+}
+```
+
+<Warning>
+  Always close models when done to prevent memory leaks. Use `ModelManager.unload()` to close all models.
+</Warning>
+
+## Model Management Commands
+
+```kotlin
+// Load all models
+ModelManager.load()
+
+// Unload all models
+ModelManager.unload()
+
+// Reload models (unload + load)
+ModelManager.reload()
+
+// Delete specific model
+model.delete()
+```
+
+## Integration with Combat Modules
+
+AI models are typically used in combat modules:
+
+1. **Feature Extraction**: Collect combat data (positions, velocities, distances)
+2. **Prediction**: Feed features to the model
+3. **Application**: Apply predicted aim adjustments
+4. **Training**: Optionally collect data for model improvement
+
+<Tip>
+  Models can be selected dynamically through the module configuration system using `ModeValueGroup`.
+</Tip>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Initialize Once" icon="power-off">
+    Only initialize the DeepLearningEngine once during startup
+  </Card>
+  
+  <Card title="Lazy Loading" icon="clock">
+    Models use lazy initialization to reduce startup time
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation">
+    Always wrap predictions in try-catch blocks
+  </Card>
+  
+  <Card title="Resource Cleanup" icon="trash">
+    Close models and predictors when no longer needed
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Engine not initialized">
+    Ensure `DeepLearningEngine.init()` is called before using models.
+  </Accordion>
+  
+  <Accordion title="Model loading fails">
+    Check that model files exist in the correct directory and are not corrupted.
+  </Accordion>
+  
+  <Accordion title="Prediction errors">
+    Verify input dimensions match the model's expected input shape.
+  </Accordion>
+  
+  <Accordion title="Performance issues">
+    Consider reducing model complexity or prediction frequency.
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="DJL Documentation" icon="book" href="https://djl.ai/">
+    Official Deep Java Library documentation
+  </Card>
+  
+  <Card title="Combat Modules" icon="crosshairs" href="/modules/combat">
+    Modules that utilize AI features
+  </Card>
+</CardGroup>

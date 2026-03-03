@@ -1,0 +1,381 @@
+---
+title: "ConfigSystem"
+description: "Hierarchical configuration system for saving and loading settings"
+---
+
+## Overview
+
+The `ConfigSystem` manages all configuration storage and retrieval in LiquidBounce. It provides a hierarchical system for organizing settings, supports JSON serialization, and handles config file management.
+
+**Package:** `net.ccbluex.liquidbounce.config`
+
+## Object Declaration
+
+```kotlin
+object ConfigSystem
+```
+
+## Constants
+
+<ParamField path="KEY_PREFIX" type="String" default="liquidbounce">
+  Prefix for all configuration keys
+  
+  ```kotlin
+  const val KEY_PREFIX = "liquidbounce"
+  ```
+</ParamField>
+
+## Properties
+
+<ParamField path="rootFolder" type="File">
+  Main configuration directory (.minecraft/LiquidBounce/)
+  
+  ```kotlin
+  val rootFolder: File
+  ```
+</ParamField>
+
+<ParamField path="userConfigsFolder" type="File">
+  User-created configs directory (.minecraft/LiquidBounce/configs/)
+  
+  ```kotlin
+  val userConfigsFolder: File
+  ```
+</ParamField>
+
+<ParamField path="backupFolder" type="File">
+  Backup configs directory (.minecraft/LiquidBounce/backups/)
+  
+  ```kotlin
+  val backupFolder: File
+  ```
+</ParamField>
+
+<ParamField path="configs" type="ArrayList<Config>">
+  List of all registered root configs
+  
+  ```kotlin
+  val configs: ArrayList<Config>
+  ```
+</ParamField>
+
+<ParamField path="isFirstLaunch" type="Boolean">
+  True if this is the first time LiquidBounce is launched
+  
+  ```kotlin
+  var isFirstLaunch: Boolean
+      private set
+  ```
+</ParamField>
+
+## Core Methods
+
+### Config Registration
+
+<ParamField path="root()" type="fun root(name: String, tree: MutableCollection<out ValueGroup>): Config">
+  Creates and registers a root config.
+  
+  ```kotlin
+  fun root(name: String, tree: MutableCollection<out ValueGroup> = mutableListOf()): Config
+  ```
+  
+  **Example:**
+  ```kotlin
+  val modulesConfig = ConfigSystem.root("modules", modules)
+  ```
+</ParamField>
+
+<ParamField path="root()" type="fun root(config: Config): Config">
+  Registers an existing config instance.
+  
+  ```kotlin
+  fun root(config: Config): Config
+  ```
+</ParamField>
+
+### Config Storage
+
+<ParamField path="store()" type="fun store(config: Config)">
+  Saves a config to its JSON file.
+  
+  ```kotlin
+  fun store(config: Config)
+  ```
+  
+  **Example:**
+  ```kotlin
+  ConfigSystem.store(ModuleManager.modulesConfig)
+  ```
+</ParamField>
+
+<ParamField path="storeAll()" type="fun storeAll()">
+  Saves all registered configs.
+  
+  ```kotlin
+  fun storeAll()
+  ```
+  
+  Called automatically on world change and disconnect.
+</ParamField>
+
+### Config Loading
+
+<ParamField path="load()" type="fun load(config: Config)">
+  Loads a config from its JSON file.
+  
+  ```kotlin
+  fun load(config: Config)
+  ```
+  
+  **Example:**
+  ```kotlin
+  ConfigSystem.load(ModuleManager.modulesConfig)
+  ```
+</ParamField>
+
+<ParamField path="loadAll()" type="fun loadAll()">
+  Loads all registered configs.
+  
+  ```kotlin
+  fun loadAll()
+  ```
+</ParamField>
+
+### Backup & Restore
+
+<ParamField path="backup()" type="fun backup(fileName: String, groups: Iterable<Config>)">
+  Creates a ZIP backup of configs.
+  
+  ```kotlin
+  fun backup(fileName: String, groups: Iterable<Config> = this.configs)
+  ```
+  
+  **Example:**
+  ```kotlin
+  ConfigSystem.backup("backup-2024-01-01")
+  ```
+</ParamField>
+
+<ParamField path="restore()" type="fun restore(fileName: String)">
+  Restores configs from a ZIP backup.
+  
+  ```kotlin
+  fun restore(fileName: String)
+  ```
+  
+  **Example:**
+  ```kotlin
+  ConfigSystem.restore("backup-2024-01-01")
+  ```
+</ParamField>
+
+### Value Lookup
+
+<ParamField path="findValueByKey()" type="fun findValueByKey(key: String): Value<*>?">
+  Finds a value by its key path.
+  
+  ```kotlin
+  fun findValueByKey(key: String): Value<*>?
+  ```
+  
+  **Example:**
+  ```kotlin
+  val value = ConfigSystem.findValueByKey("liquidbounce.module.killAura.range")
+  ```
+</ParamField>
+
+<ParamField path="findValueGroupByKey()" type="fun findValueGroupByKey(key: String): ValueGroup?">
+  Finds a value group by its key path.
+  
+  ```kotlin
+  fun findValueGroupByKey(key: String): ValueGroup?
+  ```
+</ParamField>
+
+<ParamField path="valueKeySequence()" type="fun valueKeySequence(prefix: String): Sequence<String>">
+  Returns sequence of all value keys with given prefix.
+  
+  ```kotlin
+  fun valueKeySequence(prefix: String): Sequence<String>
+  ```
+</ParamField>
+
+<ParamField path="valueGroupsKeySequence()" type="fun valueGroupsKeySequence(prefix: String): Sequence<String>">
+  Returns sequence of all value group keys with given prefix.
+  
+  ```kotlin
+  fun valueGroupsKeySequence(prefix: String): Sequence<String>
+  ```
+</ParamField>
+
+### Serialization
+
+<ParamField path="serializeValueGroup()" type="fun serializeValueGroup(valueGroup: ValueGroup, gson: Gson): JsonObject">
+  Serializes a value group to JSON.
+  
+  ```kotlin
+  fun serializeValueGroup(valueGroup: ValueGroup, gson: Gson = fileGson): JsonObject
+  ```
+</ParamField>
+
+<ParamField path="deserializeValueGroup()" type="fun deserializeValueGroup(valueGroup: ValueGroup, jsonElement: JsonElement)">
+  Deserializes JSON into a value group.
+  
+  ```kotlin
+  fun deserializeValueGroup(valueGroup: ValueGroup, jsonElement: JsonElement)
+  ```
+</ParamField>
+
+<ParamField path="deserializeValue()" type="fun deserializeValue(value: Value<*>, jsonObject: JsonObject)">
+  Deserializes JSON into a value.
+  
+  ```kotlin
+  fun deserializeValue(value: Value<*>, jsonObject: JsonObject)
+  ```
+</ParamField>
+
+## Usage Examples
+
+### Creating a Config
+
+```kotlin
+object MyFeature {
+    val enabled by boolean("Enabled", true)
+    val speed by float("Speed", 1.0f, 0.1f..5.0f)
+    val mode by choices("Mode", arrayOf("Fast", "Slow"), "Fast")
+}
+
+val myConfig = ConfigSystem.root("myfeature", mutableListOf(MyFeature))
+```
+
+### Saving and Loading
+
+```kotlin
+// Save config
+ConfigSystem.store(myConfig)
+
+// Load config
+ConfigSystem.load(myConfig)
+
+// Save all configs
+ConfigSystem.storeAll()
+
+// Load all configs
+ConfigSystem.loadAll()
+```
+
+### Creating Backups
+
+```kotlin
+// Create backup
+val timestamp = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(Date())
+ConfigSystem.backup("backup-$timestamp")
+
+// Restore from backup
+ConfigSystem.restore("backup-2024-01-01-12-00-00")
+```
+
+### Finding Values
+
+```kotlin
+// Find value by key
+val rangeValue = ConfigSystem.findValueByKey("liquidbounce.module.killAura.range")
+if (rangeValue != null && rangeValue is RangedValue) {
+    println("Range: ${rangeValue.get()}")
+}
+
+// Find value group
+val killAura = ConfigSystem.findValueGroupByKey("liquidbounce.module.killAura")
+if (killAura is ClientModule) {
+    killAura.enabled = true
+}
+```
+
+### Iterating Values
+
+```kotlin
+// Get all values with prefix
+val moduleValues = ConfigSystem.valueKeySequence("liquidbounce.module")
+for (key in moduleValues) {
+    val value = ConfigSystem.findValueByKey(key)
+    println("$key = ${value?.get()}")
+}
+```
+
+## Config File Structure
+
+Configs are stored as JSON files:
+
+```json
+{
+  "name": "modules",
+  "value": [
+    {
+      "name": "KillAura",
+      "value": [
+        {
+          "name": "Enabled",
+          "value": true
+        },
+        {
+          "name": "Range",
+          "value": 4.2
+        },
+        {
+          "name": "Mode",
+          "active": "Single",
+          "choices": {
+            "Single": {
+              "name": "Single",
+              "value": []
+            },
+            "Multi": {
+              "name": "Multi",
+              "value": [
+                {
+                  "name": "MaxTargets",
+                  "value": 3
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Automatic Config Management
+
+Configs are automatically managed:
+
+1. **On World Change** - All configs saved
+2. **On Disconnect** - All configs saved
+3. **On Client Shutdown** - All configs saved
+4. **On First Launch** - Default configs created
+
+## Best Practices
+
+1. **Register configs early** - During initialization
+2. **Use meaningful names** - Config file names should be clear
+3. **Group related settings** - Use ValueGroups to organize
+4. **Create backups before risky operations** - Prevent data loss
+5. **Handle load errors gracefully** - Invalid configs shouldn't crash
+6. **Use normalized keys** - Always use `liquidbounce.` prefix
+
+## Migration Support
+
+ConfigSystem supports config migration for renamed values:
+
+```kotlin
+val newValue by float("NewName", 1.0f, aliases = listOf("OldName"))
+```
+
+When loading, if "NewName" is not found, ConfigSystem will look for "OldName".
+
+## See Also
+
+- [Value Types](/api/value-types) - Available configuration value types
+- [AutoConfig](/api/auto-config) - Automatic config system
+- [ValueGroup](/api/value-types) - Organizing values

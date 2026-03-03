@@ -1,0 +1,350 @@
+---
+title: "Command Builder"
+description: "DSL for creating commands with parameters, subcommands, and handlers"
+---
+
+## Overview
+
+The Command Builder provides a Kotlin DSL (Domain-Specific Language) for creating commands with a clean, declarative syntax. It simplifies command creation with support for parameters, subcommands, auto-completion, and validation.
+
+**Package:** `net.ccbluex.liquidbounce.features.command.builder`
+
+## Core Classes
+
+### Command
+
+```kotlin
+class Command(
+    val name: String,
+    val aliases: List<String> = emptyList(),
+    val executable: Boolean = true,
+    val parameters: List<Parameter<*>> = emptyList(),
+    val subcommandMap: Map<String, Command> = emptyMap(),
+    val handler: Handler? = null
+)
+```
+
+<ParamField path="name" type="String" required>
+  Command name (primary identifier)
+</ParamField>
+
+<ParamField path="aliases" type="List<String>" default="emptyList()">
+  Alternative names for the command
+</ParamField>
+
+<ParamField path="executable" type="Boolean" default="true">
+  Whether the command can be executed directly
+</ParamField>
+
+<ParamField path="parameters" type="List<Parameter<*>>" default="emptyList()">
+  List of command parameters
+</ParamField>
+
+<ParamField path="subcommandMap" type="Map<String, Command>" default="emptyMap()">
+  Map of subcommands
+</ParamField>
+
+<ParamField path="handler" type="Handler?" default="null">
+  Command execution handler
+</ParamField>
+
+## Building Commands
+
+### Basic Command
+
+```kotlin
+val greetCommand = Command("greet") {
+    handler { context ->
+        chat("Hello, world!")
+    }
+}
+```
+
+### Command with Aliases
+
+```kotlin
+val toggleCommand = Command(
+    name = "toggle",
+    aliases = listOf("t", "enable", "disable")
+) {
+    // Command implementation
+}
+```
+
+### Command with Parameters
+
+```kotlin
+val friendCommand = Command("friend") {
+    val action = parameter<String>("action", required = true)
+    val name = parameter<String>("name", required = true)
+    
+    handler { context ->
+        val actionValue = context[action]
+        val nameValue = context[name]
+        
+        when (actionValue) {
+            "add" -> addFriend(nameValue)
+            "remove" -> removeFriend(nameValue)
+            else -> chat("Unknown action: $actionValue")
+        }
+    }
+}
+```
+
+### Command with Subcommands
+
+```kotlin
+val configCommand = Command("config") {
+    subcommand("load") {
+        val name = parameter<String>("name", required = true)
+        
+        handler { context ->
+            loadConfig(context[name])
+        }
+    }
+    
+    subcommand("save") {
+        val name = parameter<String>("name", required = false, default = "current")
+        
+        handler { context ->
+            saveConfig(context[name])
+        }
+    }
+    
+    subcommand("list") {
+        handler {
+            listConfigs()
+        }
+    }
+}
+
+// Usage:
+// .config load HypixelBedwars
+// .config save MyConfig
+// .config list
+```
+
+## Parameters
+
+### Required Parameters
+
+```kotlin
+val param = parameter<String>(
+    name = "username",
+    required = true
+)
+```
+
+### Optional Parameters
+
+```kotlin
+val param = parameter<Int>(
+    name = "count",
+    required = false,
+    default = 10
+)
+```
+
+### Vararg Parameters
+
+```kotlin
+val message = parameter<String>(
+    name = "message",
+    vararg = true
+)
+
+// Usage: .say Hello world this is a message
+// message will contain all arguments as array
+```
+
+### Parameter with Validation
+
+```kotlin
+val count = parameter(
+    name = "count",
+    verifier = Parameter.Verificator { text ->
+        val value = text.toIntOrNull()
+        if (value == null || value < 1 || value > 100) {
+            Parameter.Verificator.Result.Error("Count must be 1-100")
+        } else {
+            Parameter.Verificator.Result.Ok(value)
+        }
+    }
+)
+```
+
+### Parameter with Auto-completion
+
+```kotlin
+val module = parameter(
+    name = "module",
+    autocompletionHandler = AutoCompletionProvider { begin, args ->
+        ModuleManager
+            .filter { it.name.startsWith(begin, ignoreCase = true) }
+            .map { it.name }
+    }
+)
+```
+
+## Handler Context
+
+### Accessing Parameters
+
+```kotlin
+handler { context ->
+    val paramValue = context[parameter]
+    // Use paramValue
+}
+```
+
+### Getting Command Info
+
+```kotlin
+handler { context ->
+    val command = context.command
+    println("Executing: ${command.name}")
+}
+```
+
+### All Parameters
+
+```kotlin
+handler { context ->
+    val allParams = context.parameters
+    // Array of all parameter values
+}
+```
+
+## Advanced Examples
+
+### Module Toggle Command
+
+```kotlin
+val toggleCommand = Command("toggle", aliases = listOf("t")) {
+    val moduleName = parameter(
+        name = "module",
+        required = true,
+        verifier = Parameter.Verificator { text ->
+            val module = ModuleManager[text]
+            if (module == null) {
+                Parameter.Verificator.Result.Error("Module not found")
+            } else {
+                Parameter.Verificator.Result.Ok(module)
+            }
+        },
+        autocompletionHandler = AutoCompletionProvider { begin, _ ->
+            ModuleManager
+                .filter { it.name.startsWith(begin, ignoreCase = true) }
+                .map { it.name }
+        }
+    )
+    
+    handler { context ->
+        val module = context[moduleName] as ClientModule
+        module.enabled = !module.enabled
+        
+        val state = if (module.enabled) "enabled" else "disabled"
+        chat("${module.name} $state")
+    }
+}
+```
+
+### Config Management Command
+
+```kotlin
+val configCommand = Command("config") {
+    subcommand("load") {
+        val configName = parameter(
+            name = "name",
+            required = true,
+            autocompletionHandler = AutoCompletionProvider { begin, _ ->
+                ConfigSystem.userConfigsFolder
+                    .listFiles { file -> file.extension == "json" }
+                    ?.map { it.nameWithoutExtension }
+                    ?.filter { it.startsWith(begin, ignoreCase = true) }
+                    ?: emptyList()
+            }
+        )
+        
+        handler { context ->
+            val name = context[configName]
+            try {
+                loadUserConfig(name)
+                chat("Config loaded: $name")
+            } catch (e: Exception) {
+                chat("Failed to load config: ${e.message}")
+            }
+        }
+    }
+    
+    subcommand("save") {
+        val configName = parameter<String>("name", required = true)
+        
+        handler { context ->
+            val name = context[configName]
+            try {
+                saveUserConfig(name)
+                chat("Config saved: $name")
+            } catch (e: Exception) {
+                chat("Failed to save config: ${e.message}")
+            }
+        }
+    }
+    
+    subcommand("delete") {
+        val configName = parameter(
+            name = "name",
+            required = true,
+            autocompletionHandler = AutoCompletionProvider { begin, _ ->
+                ConfigSystem.userConfigsFolder
+                    .listFiles { file -> file.extension == "json" }
+                    ?.map { it.nameWithoutExtension }
+                    ?.filter { it.startsWith(begin, ignoreCase = true) }
+                    ?: emptyList()
+            }
+        )
+        
+        handler { context ->
+            val name = context[configName]
+            val file = File(ConfigSystem.userConfigsFolder, "$name.json")
+            if (file.delete()) {
+                chat("Config deleted: $name")
+            } else {
+                chat("Failed to delete config: $name")
+            }
+        }
+    }
+    
+    subcommand("list") {
+        handler {
+            val configs = ConfigSystem.userConfigsFolder
+                .listFiles { file -> file.extension == "json" }
+                ?.map { it.nameWithoutExtension }
+                ?: emptyList()
+            
+            if (configs.isEmpty()) {
+                chat("No configs found")
+            } else {
+                chat("Available configs:")
+                configs.forEach { chat("  - $it") }
+            }
+        }
+    }
+}
+```
+
+## Best Practices
+
+1. **Use meaningful parameter names** - Makes commands self-documenting
+2. **Provide auto-completion** - Improves user experience
+3. **Validate parameters** - Catch errors before execution
+4. **Add aliases for common commands** - Speed up command entry
+5. **Group related commands with subcommands** - Better organization
+6. **Provide helpful error messages** - Guide users to correct usage
+7. **Use varargs for message-like parameters** - Natural syntax
+
+## See Also
+
+- [CommandManager](/api/command-manager) - Command execution and management
+- [Parameters](/api/parameters) - Parameter system details
+- [Parameter Presets](/api/parameters) - Common parameter types

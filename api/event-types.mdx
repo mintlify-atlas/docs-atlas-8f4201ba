@@ -1,0 +1,475 @@
+---
+title: "Event Types"
+description: "Complete reference of all event types in LiquidBounce"
+---
+
+## Overview
+
+LiquidBounce provides a comprehensive set of event types organized into categories. All events extend the base `Event` class.
+
+**Package:** `net.ccbluex.liquidbounce.event.events`
+
+## Event Categories
+
+Events are organized in the following files:
+
+- **GameEvents.kt** - Core game events
+- **PlayerEvents.kt** - Player-specific events  
+- **NetworkEvents.kt** - Network/packet events
+- **WorldEvents.kt** - World and chunk events
+- **EntityEvents.kt** - Entity-related events
+- **UserInterfaceEvents.kt** - UI and screen events
+- **WindowEvents.kt** - Window and input events
+- **DrawEvents.kt** - Rendering events
+- **ClientEvents.kt** - Client-specific events
+
+## Game Events
+
+### GameTickEvent
+
+```kotlin
+data object GameTickEvent : Event()
+```
+
+Called every game tick (20 times per second).
+
+**Usage:**
+```kotlin
+private val tickHandler = handler<GameTickEvent> {
+    // Runs 20 times per second
+}
+```
+
+### GameRenderEvent
+
+```kotlin
+data object GameRenderEvent : Event()
+```
+
+Called during game rendering.
+
+### RotationUpdateEvent
+
+```kotlin
+data object RotationUpdateEvent : Event()
+```
+
+Called when rotations should be updated.
+
+## Player Events
+
+### PlayerTickEvent
+
+```kotlin
+data object PlayerTickEvent : Event()
+```
+
+Called every player tick.
+
+### PlayerMoveEvent
+
+```kotlin
+class PlayerMoveEvent(
+    var movement: Vec3d
+) : Event()
+```
+
+Called when player moves. Modifiable.
+
+**Usage:**
+```kotlin
+private val moveHandler = handler<PlayerMoveEvent> { event ->
+    event.movement = Vec3d(0.0, 0.0, 0.0) // Stop movement
+}
+```
+
+### PlayerJumpEvent
+
+```kotlin
+class PlayerJumpEvent(
+    var motion: Float
+) : Event()
+```
+
+Called when player jumps. Can modify jump height.
+
+### PlayerSafeWalkEvent
+
+```kotlin
+class PlayerSafeWalkEvent : Event() {
+    var isSafeWalk = false
+}
+```
+
+Called to check if player should safe walk (prevent falling off edges).
+
+### AttackEntityEvent
+
+```kotlin
+class AttackEntityEvent(
+    val entity: Entity
+) : Event()
+```
+
+Called when attacking an entity.
+
+## Network Events
+
+### PacketEvent
+
+```kotlin
+class PacketEvent(
+    val packet: Packet<*>,
+    val origin: TransferOrigin
+) : CancellableEvent()
+```
+
+Called for sent and received packets. Can be cancelled.
+
+**Usage:**
+```kotlin
+private val packetHandler = handler<PacketEvent> { event ->
+    when (event.packet) {
+        is ClientboundPlayerPositionPacket -> {
+            // Handle position packet
+        }
+    }
+}
+```
+
+### ServerConnectEvent
+
+```kotlin
+class ServerConnectEvent(
+    val serverInfo: ServerInfo
+) : Event()
+```
+
+Called when connecting to a server.
+
+### DisconnectEvent
+
+```kotlin
+data object DisconnectEvent : Event()
+```
+
+Called when disconnecting from server.
+
+## World Events
+
+### WorldChangeEvent
+
+```kotlin
+class WorldChangeEvent(
+    val world: ClientLevel?
+) : Event()
+```
+
+Called when world changes (join/leave).
+
+### ChunkLoadEvent
+
+```kotlin
+class ChunkLoadEvent(
+    val chunk: LevelChunk
+) : Event()
+```
+
+Called when a chunk is loaded.
+
+### ChunkUnloadEvent
+
+```kotlin
+class ChunkUnloadEvent(
+    val chunkX: Int,
+    val chunkZ: Int
+) : Event()
+```
+
+Called when a chunk is unloaded.
+
+### BlockChangeEvent
+
+```kotlin
+class BlockChangeEvent(
+    val blockPos: BlockPos,
+    val blockState: BlockState
+) : Event()
+```
+
+Called when a block changes.
+
+## Input Events
+
+### KeyboardKeyEvent
+
+```kotlin
+class KeyboardKeyEvent(
+    val window: Long,
+    val keyCode: Int,
+    val scanCode: Int,
+    val action: Int,
+    val mods: Int
+) : Event()
+```
+
+Called on keyboard input.
+
+**Usage:**
+```kotlin
+private val keyHandler = handler<KeyboardKeyEvent> { event ->
+    if (event.action == GLFW.GLFW_PRESS) {
+        when (event.keyCode) {
+            GLFW.GLFW_KEY_F -> {
+                // F key pressed
+            }
+        }
+    }
+}
+```
+
+### MouseButtonEvent
+
+```kotlin
+class MouseButtonEvent(
+    val window: Long,
+    val button: Int,
+    val action: Int,
+    val mods: Int
+) : Event()
+```
+
+Called on mouse button input.
+
+### MouseScrollEvent
+
+```kotlin
+class MouseScrollEvent(
+    val window: Long,
+    val horizontal: Double,
+    val vertical: Double
+) : Event()
+```
+
+Called on mouse scroll.
+
+## Module Events
+
+### ModuleToggleEvent
+
+```kotlin
+class ModuleToggleEvent(
+    val moduleName: String,
+    val hidden: Boolean,
+    val enabled: Boolean
+) : Event()
+```
+
+Called when a module is toggled.
+
+### ModuleActivationEvent
+
+```kotlin
+class ModuleActivationEvent(
+    val moduleName: String
+) : Event()
+```
+
+Called when a module is activated.
+
+### ValueChangedEvent
+
+```kotlin
+class ValueChangedEvent(
+    val value: Value<*>
+) : Event()
+```
+
+Called when a config value changes.
+
+## Render Events
+
+### WorldRenderEvent
+
+```kotlin
+class WorldRenderEvent(
+    val matrixStack: PoseStack,
+    val partialTicks: Float,
+    val camera: Camera
+) : Event()
+```
+
+Called during world rendering.
+
+**Usage:**
+```kotlin
+private val renderHandler = handler<WorldRenderEvent> { event ->
+    // Render ESP boxes, tracers, etc.
+    renderBox(event.matrixStack, pos, color)
+}
+```
+
+### OverlayRenderEvent
+
+```kotlin
+class OverlayRenderEvent(
+    val context: GuiGraphics,
+    val tickDelta: Float
+) : Event()
+```
+
+Called during HUD overlay rendering.
+
+### ScreenRenderEvent
+
+```kotlin
+class ScreenRenderEvent(
+    val screen: Screen,
+    val context: GuiGraphics,
+    val mouseX: Int,
+    val mouseY: Int,
+    val tickDelta: Float
+) : Event()
+```
+
+Called during screen rendering.
+
+## Combat Events
+
+### TargetChangeEvent
+
+```kotlin
+class TargetChangeEvent(
+    val target: PlayerData
+) : Event()
+```
+
+Called when combat target changes.
+
+## Notification Events
+
+### NotificationEvent
+
+```kotlin
+class NotificationEvent(
+    val title: String,
+    val message: String,
+    val severity: Severity
+) : Event()
+```
+
+Called to display notifications.
+
+**Severity:**
+- `INFO`
+- `SUCCESS` 
+- `WARNING`
+- `ERROR`
+- `ENABLED`
+- `DISABLED`
+
+## Chat Events
+
+### ChatReceiveEvent
+
+```kotlin
+class ChatReceiveEvent(
+    val message: Component,
+    var chatType: ChatType
+) : CancellableEvent()
+```
+
+Called when receiving chat message. Can be cancelled.
+
+### ChatSendEvent
+
+```kotlin
+class ChatSendEvent(
+    var message: String
+) : CancellableEvent()
+```
+
+Called when sending chat message. Can modify or cancel.
+
+## Session Events
+
+### SessionEvent
+
+```kotlin
+class SessionEvent(
+    val session: GameProfile
+) : Event()
+```
+
+Called on session change (login).
+
+## Window Events
+
+### WindowResizeEvent
+
+```kotlin
+class WindowResizeEvent(
+    val window: Window
+) : Event()
+```
+
+Called when game window is resized.
+
+## Base Event Class
+
+All events inherit from:
+
+```kotlin
+abstract class Event {
+    var isCompleted = false
+        internal set
+}
+```
+
+## Cancellable Events
+
+Some events can be cancelled:
+
+```kotlin
+abstract class CancellableEvent : Event() {
+    var isCancelled = false
+        private set
+    
+    fun cancelEvent() {
+        isCancelled = true
+    }
+}
+```
+
+**Cancellable Events:**
+- PacketEvent
+- ChatReceiveEvent
+- ChatSendEvent
+- PlayerMoveEvent
+- Many more...
+
+## Event Ordering
+
+Events are processed by priority:
+
+1. **FIRST_PRIORITY** (1000) - Runs first
+2. **SAFETY_FEATURE** (900)
+3. **Default** (0)
+4. **MODEL_STATE** (500)
+5. **READ_FINAL_STATE** (-500)
+6. **LAST_PRIORITY** (-1000) - Runs last
+
+## Best Practices
+
+1. **Use specific events** - More efficient than generic
+2. **Cancel early if possible** - Prevent unnecessary processing
+3. **Keep handlers lightweight** - Events fire frequently
+4. **Check running state** - Handler respects EventListener.running
+5. **Handle null safety** - Some event properties can be null
+6. **Use correct priority** - Default works for most cases
+
+## See Also
+
+- [EventManager](/api/event-manager) - Event system core
+- [EventListener](/api/event-listener) - Creating event handlers
+- [ClientModule](/api/client-module) - Module event handling

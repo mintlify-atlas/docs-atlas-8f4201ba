@@ -1,0 +1,287 @@
+---
+title: Frequently Asked Questions
+description: Common questions and answers about LiquidBounce
+icon: question
+---
+
+## General Questions
+
+<AccordionGroup>
+  <Accordion title="What is LiquidBounce?">
+    LiquidBounce is a free and open-source mixin-based injection hacked client using the Fabric API for Minecraft. It provides various modules and features to enhance your Minecraft gameplay.
+    
+    <Note>
+      LiquidBounce is licensed under GPL-3.0 and is completely free to use.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Is LiquidBounce safe to use?">
+    Yes, LiquidBounce is open-source, which means anyone can review the code. You can check the source code on [GitHub](https://github.com/CCBlueX/LiquidBounce) to verify there are no malicious components.
+    
+    However, using any client modifications may violate server rules or terms of service. Always check server policies before using LiquidBounce.
+  </Accordion>
+
+  <Accordion title="Which Minecraft versions are supported?">
+    LiquidBounce supports multiple Minecraft versions through Fabric. Check the [official website](https://liquidbounce.net) or GitHub releases for the latest supported versions.
+  </Accordion>
+
+  <Accordion title="Is LiquidBounce free?">
+    Yes, LiquidBounce is completely free and open-source under the GPL-3.0 license. There are no premium features or paid versions.
+  </Accordion>
+
+  <Accordion title="Can I use LiquidBounce on servers?">
+    Technically yes, but many servers prohibit the use of client modifications. Using LiquidBounce on servers may result in a ban. Always respect server rules and only use it where permitted.
+  </Accordion>
+</AccordionGroup>
+
+## Installation Questions
+
+<AccordionGroup>
+  <Accordion title="How do I install LiquidBounce?">
+    1. Install [Fabric](https://fabricmc.net/use/) for your Minecraft version
+    2. Download LiquidBounce from the [official website](https://liquidbounce.net)
+    3. Place the `.jar` file in your `.minecraft/mods` folder
+    4. Launch Minecraft with the Fabric profile
+    
+    <Tip>
+      See the [Installation Guide](/installation) for detailed instructions.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="Do I need Fabric or Forge?">
+    LiquidBounce uses **Fabric**, not Forge. Make sure you have the Fabric mod loader installed, not Forge.
+  </Accordion>
+
+  <Accordion title="Where do I put the LiquidBounce file?">
+    Place the LiquidBounce `.jar` file in your `.minecraft/mods` folder:
+    
+    - **Windows**: `%appdata%/.minecraft/mods`
+    - **macOS**: `~/Library/Application Support/minecraft/mods`
+    - **Linux**: `~/.minecraft/mods`
+  </Accordion>
+
+  <Accordion title="LiquidBounce isn't showing up in my mods list">
+    Check the following:
+    
+    1. You're using **Fabric**, not Forge or Vanilla
+    2. The `.jar` file is in the correct `mods` folder
+    3. You're using a compatible Minecraft version
+    4. Check the logs for any errors (see [Troubleshooting](/community/troubleshooting))
+  </Accordion>
+
+  <Accordion title="Can I use LiquidBounce with other mods?">
+    Yes, LiquidBounce is compatible with most Fabric mods. However, some mods may conflict. If you experience issues, try disabling other mods to identify conflicts.
+  </Accordion>
+</AccordionGroup>
+
+## Module Usage
+
+<AccordionGroup>
+  <Accordion title="How do I enable modules?">
+    Press the **Right Shift** key (default) to open the ClickGUI, then click on modules to enable/disable them. You can also bind modules to keys for quick toggling.
+    
+    <Tip>
+      See the [Modules Overview](/modules/overview) for detailed information.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="How do I bind modules to keys?">
+    1. Open the ClickGUI (Right Shift)
+    2. Right-click or hover over a module
+    3. Click on the bind option
+    4. Press the key you want to bind
+    
+    Alternatively, use the command:
+    ```
+    .bind <module> <key>
+    ```
+  </Accordion>
+
+  <Accordion title="How do I change module settings?">
+    In the ClickGUI, click on a module to expand its settings. You can adjust values, toggle options, and configure the module to your preferences.
+  </Accordion>
+
+  <Accordion title="What's the difference between modules and scripts?">
+    - **Modules** are built-in features coded in Kotlin/Java
+    - **Scripts** are custom modules written in JavaScript that extend functionality
+    
+    Scripts allow users to create custom modules without modifying the core code.
+  </Accordion>
+
+  <Accordion title="My modules aren't working properly">
+    Try the following:
+    
+    1. Check if the module is enabled
+    2. Review the module settings - some require specific configurations
+    3. Check for mod conflicts
+    4. Verify you're on a compatible server/version
+    5. Check logs for errors (`.minecraft/logs/latest.log`)
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Questions
+
+<AccordionGroup>
+  <Accordion title="Where are my settings saved?">
+    LiquidBounce stores configurations in:
+    
+    - **Windows**: `%appdata%/.minecraft/LiquidBounce/`
+    - **macOS**: `~/Library/Application Support/minecraft/LiquidBounce/`
+    - **Linux**: `~/.minecraft/LiquidBounce/`
+  </Accordion>
+
+  <Accordion title="How do I backup my configuration?">
+    Copy the entire `LiquidBounce` folder from your `.minecraft` directory to a safe location. This includes all settings, scripts, and configurations.
+  </Accordion>
+
+  <Accordion title="Can I share my configuration with friends?">
+    Yes! You can export your settings and share the configuration files. Others can import them by placing the files in their LiquidBounce folder.
+  </Accordion>
+
+  <Accordion title="How do I reset to default settings?">
+    Delete or rename the `LiquidBounce` folder in your `.minecraft` directory. The client will create a new folder with default settings on next launch.
+    
+    <Warning>
+      This will delete all your custom configurations, keybinds, and scripts. Make a backup first!
+    </Warning>
+  </Accordion>
+
+  <Accordion title="What are the main configuration files?">
+    - `accounts.json` - Saved alt accounts
+    - `settings.json` - Module settings
+    - `binds.json` - Keybinds
+    - `scripts/` - Custom scripts folder
+  </Accordion>
+</AccordionGroup>
+
+## Commands
+
+<AccordionGroup>
+  <Accordion title="How do I use commands?">
+    Open the chat and type `.` (dot) followed by the command. For example:
+    
+    ```
+    .help
+    .bind Fly F
+    .toggle Sprint
+    ```
+  </Accordion>
+
+  <Accordion title="What's the command prefix?">
+    The default command prefix is `.` (dot). You can change it in the settings if needed.
+  </Accordion>
+
+  <Accordion title="How do I see all available commands?">
+    Type `.help` in chat to see a list of all available commands and their usage.
+  </Accordion>
+
+  <Accordion title="Can I create custom commands?">
+    Yes, you can create custom commands using the scripting API. See the [Scripting Guide](/scripting/getting-started) for more information.
+  </Accordion>
+</AccordionGroup>
+
+## Scripting
+
+<AccordionGroup>
+  <Accordion title="What scripting language does LiquidBounce use?">
+    LiquidBounce uses JavaScript for scripting, allowing you to create custom modules and commands.
+  </Accordion>
+
+  <Accordion title="Where do I put script files?">
+    Place script files (`.js`) in the `LiquidBounce/scripts/` folder in your `.minecraft` directory.
+  </Accordion>
+
+  <Accordion title="How do I reload scripts?">
+    Use the command:
+    ```
+    .reload
+    ```
+    
+    This will reload all scripts without restarting Minecraft.
+  </Accordion>
+
+  <Accordion title="Where can I find example scripts?">
+    Check the [Scripting Guide](/scripting/getting-started) and the community forum for script examples and tutorials.
+  </Accordion>
+
+  <Accordion title="My script isn't loading">
+    1. Check the file extension is `.js`
+    2. Verify it's in the correct folder (`LiquidBounce/scripts/`)
+    3. Check for syntax errors in your script
+    4. Look at the console/logs for error messages
+    5. Try using `.reload` to reload scripts
+  </Accordion>
+</AccordionGroup>
+
+## Performance
+
+<AccordionGroup>
+  <Accordion title="LiquidBounce is causing lag">
+    Try these optimizations:
+    
+    1. Disable unused modules
+    2. Reduce render distance
+    3. Lower graphics settings
+    4. Disable resource-intensive modules (ESP, Tracers, etc.)
+    5. Check for mod conflicts
+    
+    See the [Troubleshooting Guide](/community/troubleshooting) for more tips.
+  </Accordion>
+
+  <Accordion title="How do I improve FPS?">
+    1. Install performance mods like Sodium or Iris
+    2. Disable visual modules you don't need
+    3. Reduce particle effects
+    4. Lower Minecraft's graphics settings
+    5. Allocate more RAM to Minecraft (2-4GB recommended)
+  </Accordion>
+
+  <Accordion title="Can I use LiquidBounce with Sodium/Iris?">
+    Yes, LiquidBounce is compatible with performance mods like Sodium and Iris. They can actually improve performance when used together.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Game crashes on startup">
+    1. Check you're using the correct Minecraft version
+    2. Verify Fabric is properly installed
+    3. Check for mod conflicts
+    4. Review crash logs in `.minecraft/crash-reports/`
+    5. Try removing other mods to isolate the issue
+    
+    See the [Troubleshooting Guide](/community/troubleshooting) for detailed help.
+  </Accordion>
+
+  <Accordion title="Where do I find log files?">
+    - **Latest log**: `.minecraft/logs/latest.log`
+    - **Crash reports**: `.minecraft/crash-reports/`
+    
+    These files contain error messages that can help diagnose issues.
+  </Accordion>
+
+  <Accordion title="How do I enable debug mode?">
+    Debug mode provides additional logging information. Enable it in the LiquidBounce settings or check the logs for detailed error messages.
+  </Accordion>
+</AccordionGroup>
+
+## Still Have Questions?
+
+<CardGroup cols={2}>
+  <Card title="Discord Community" icon="discord" href="https://liquidbounce.net/discord">
+    Join our Discord server for real-time help
+  </Card>
+  
+  <Card title="Forum" icon="comments" href="https://forums.ccbluex.net">
+    Browse discussions and ask questions
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/CCBlueX/LiquidBounce/issues">
+    Report bugs or request features
+  </Card>
+  
+  <Card title="Support Guide" icon="life-ring" href="/community/support">
+    Learn how to get help effectively
+  </Card>
+</CardGroup>

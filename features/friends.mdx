@@ -1,0 +1,397 @@
+---
+title: Friend System
+description: Manage friends and customize module behavior for friendly players
+icon: user-group
+---
+
+# Friend System
+
+The Friend System in LiquidBounce allows you to mark players as friends, preventing accidental attacks and identifying them with special markers. The `FriendManager` handles all friend-related operations.
+
+## Overview
+
+The Friend System provides:
+
+<CardGroup cols={2}>
+  <Card title="Friend Management" icon="users">
+    Add, remove, and organize friends
+  </Card>
+  <Card title="Attack Prevention" icon="shield">
+    Optionally prevent attacking friends
+  </Card>
+  <Card title="Visual Markers" icon="tag">
+    Friends are tagged in-game for easy identification
+  </Card>
+  <Card title="Aliases" icon="signature">
+    Set custom display names for friends
+  </Card>
+</CardGroup>
+
+## Friend Manager
+
+The `FriendManager` is a config-based singleton:
+
+```kotlin
+object FriendManager : Config("Friends"), EventListener {
+    val friends by list(name, TreeSet<Friend>(), valueType = ValueType.FRIEND)
+    private val cancelAttack by boolean("CancelAttack", false)
+}
+```
+
+<Info>
+Friends are stored in a `TreeSet` which keeps them sorted alphabetically by name.
+</Info>
+
+## Friend Class
+
+Each friend is represented by a `Friend` object:
+
+```kotlin
+class Friend(val name: String, var alias: String?) : Comparable<Friend> {
+    
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as Friend
+        return name == other.name
+    }
+    
+    override fun hashCode(): Int = name.hashCode()
+    
+    override fun compareTo(other: Friend): Int = 
+        this.name.compareTo(other.name)
+    
+    fun getDefaultName(id: Int): String = "Friend $id"
+}
+```
+
+### Key Properties
+
+- **name**: The friend's username (immutable, used for equality)
+- **alias**: Optional custom display name
+- **Comparable**: Friends are sorted alphabetically
+- **Equality**: Based solely on username (case-sensitive)
+
+## Adding Friends
+
+Add a friend to the list:
+
+```kotlin
+val friend = FriendManager.Friend("PlayerName", alias = null)
+FriendManager.friends.add(friend)
+
+// Store to config
+ConfigSystem.store(FriendManager)
+```
+
+With an alias:
+
+```kotlin
+val friend = FriendManager.Friend(
+    name = "PlayerName",
+    alias = "My Best Friend"
+)
+FriendManager.friends.add(friend)
+ConfigSystem.store(FriendManager)
+```
+
+<Note>
+Friends are automatically deduplicated by username due to the `TreeSet` and `equals()` implementation.
+</Note>
+
+## Removing Friends
+
+Remove a friend by name:
+
+```kotlin
+FriendManager.friends.remove(
+    FriendManager.Friend("PlayerName", null)
+)
+ConfigSystem.store(FriendManager)
+```
+
+The `Friend` class's `equals()` method only checks the name, so you don't need to know the alias to remove a friend.
+
+## Checking Friend Status
+
+### By Username
+
+```kotlin
+if (FriendManager.isFriend("PlayerName")) {
+    // Player is a friend
+}
+```
+
+### By Entity
+
+```kotlin
+if (FriendManager.isFriend(entity)) {
+    // Entity is a friend (must be a Player)
+}
+```
+
+Implementation:
+
+```kotlin
+fun isFriend(name: String): Boolean = 
+    friends.contains(Friend(name, null))
+
+fun isFriend(entity: Entity): Boolean = 
+    entity is Player && isFriend(entity.gameProfile.name)
+```
+
+<Warning>
+Friend checks are case-sensitive and use exact username matching.
+</Warning>
+
+## Managing Aliases
+
+Set or update a friend's alias:
+
+```kotlin
+val friend = FriendManager.friends.find { it.name == "PlayerName" }
+friend?.alias = "New Nickname"
+ConfigSystem.store(FriendManager)
+```
+
+Remove an alias:
+
+```kotlin
+val friend = FriendManager.friends.find { it.name == "PlayerName" }
+friend?.alias = null
+ConfigSystem.store(FriendManager)
+```
+
+## Attack Prevention
+
+The Friend System can prevent attacking friends:
+
+```kotlin
+private val cancelAttack by boolean("CancelAttack", false)
+
+private val onAttack = handler<AttackEntityEvent> {
+    if (cancelAttack && isFriend(it.entity)) {
+        it.cancelEvent()
+    }
+}
+```
+
+### Usage
+
+Enable attack prevention:
+
+```kotlin
+// Through config or settings UI
+FriendManager.cancelAttack = true
+```
+
+When enabled:
+- All `AttackEntityEvent` for friends are cancelled
+- Combat modules will skip friends
+- Manual attacks (clicking) on friends are blocked
+
+<Info>
+This setting is stored in the configuration and persists across sessions.
+</Info>
+
+## Friend Tagging
+
+Friends are automatically tagged in-game:
+
+```kotlin
+private val tagEntityEvent = handler<TagEntityEvent> {
+    if (isFriend(it.entity)) {
+        it.assumeFriend()
+    }
+}
+```
+
+This allows:
+- Visual identification (different name colors, markers)
+- Other modules to recognize friends
+- ESP and other rendering modules to highlight friends differently
+
+## Storage and Persistence
+
+Friends are stored through the config system:
+
+```kotlin
+init {
+    ConfigSystem.root(this)
+}
+```
+
+As a root config:
+- Friends are saved to `.liquidbounce/friends.json`
+- Automatically loaded on client startup
+- Persisted when modified via `ConfigSystem.store(FriendManager)`
+
+### Storage Format
+
+```json
+{
+  "friends": [
+    {
+      "name": "Player1",
+      "alias": null
+    },
+    {
+      "name": "Player2",
+      "alias": "Best Friend"
+    }
+  ],
+  "CancelAttack": true
+}
+```
+
+## Event Integration
+
+The Friend System listens to two events:
+
+<Tabs>
+  <Tab title="TagEntityEvent">
+    Fired when an entity is being tagged for rendering/identification:
+    
+    ```kotlin
+    handler<TagEntityEvent> {
+        if (isFriend(it.entity)) {
+            it.assumeFriend()
+        }
+    }
+    ```
+    
+    This ensures friends are visually marked in-game.
+  </Tab>
+  
+  <Tab title="AttackEntityEvent">
+    Fired before attacking an entity:
+    
+    ```kotlin
+    handler<AttackEntityEvent> {
+        if (cancelAttack && isFriend(it.entity)) {
+            it.cancelEvent()
+        }
+    }
+    ```
+    
+    This prevents accidental attacks on friends when enabled.
+  </Tab>
+</Tabs>
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Team Play">
+    Add teammates as friends to prevent combat modules from targeting them:
+    
+    ```kotlin
+    // Add all team members
+    teamMembers.forEach { username ->
+        FriendManager.friends.add(
+            FriendManager.Friend(username, alias = null)
+        )
+    }
+    ConfigSystem.store(FriendManager)
+    ```
+  </Accordion>
+  
+  <Accordion title="Safe Zones">
+    Combine with attack prevention to create safe interactions:
+    
+    ```kotlin
+    // Enable attack prevention
+    FriendManager.cancelAttack = true
+    
+    // Add allies
+    FriendManager.friends.add(
+        FriendManager.Friend("AllyPlayer", "Ally")
+    )
+    ```
+  </Accordion>
+  
+  <Accordion title="Custom Identification">
+    Use aliases to add role information:
+    
+    ```kotlin
+    FriendManager.friends.add(
+        FriendManager.Friend("Player1", "Leader")
+    )
+    FriendManager.friends.add(
+        FriendManager.Friend("Player2", "Support")
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Module Integration
+
+Modules can check friend status to modify behavior:
+
+```kotlin
+// In a combat module
+val targetHandler = handler<EntityTargetEvent> {
+    if (FriendManager.isFriend(it.entity)) {
+        it.excludeFromTargeting()
+    }
+}
+
+// In an ESP module
+val renderHandler = handler<EntityRenderEvent> {
+    val color = if (FriendManager.isFriend(it.entity)) {
+        Color.GREEN  // Friends in green
+    } else {
+        Color.RED    // Others in red
+    }
+    renderBox(it.entity, color)
+}
+```
+
+## Friend Commands
+
+Friends can be managed via commands:
+
+```
+// Add friend
+.friend add PlayerName
+.friend add PlayerName "Alias"
+
+// Remove friend
+.friend remove PlayerName
+
+// List friends
+.friend list
+
+// Clear all
+.friend clear
+```
+
+## Code References
+
+<Card title="FriendManager.kt" icon="file-code">
+  Complete friend system implementation - line 32
+  <br/>`features/misc/FriendManager.kt` (81 lines)
+</Card>
+
+## Best Practices
+
+<Steps>
+  <Step title="Validate Usernames">
+    Ensure usernames are valid before adding (1-16 characters, alphanumeric)
+  </Step>
+  
+  <Step title="Store After Modifications">
+    Always call `ConfigSystem.store(FriendManager)` after adding/removing friends
+  </Step>
+  
+  <Step title="Use Attack Prevention Wisely">
+    Only enable attack prevention when actually needed to avoid confusion
+  </Step>
+  
+  <Step title="Handle Null Aliases">
+    Check for null aliases before displaying to avoid display issues
+  </Step>
+  
+  <Step title="Case Sensitivity">
+    Remember that friend checks are case-sensitive
+  </Step>
+</Steps>

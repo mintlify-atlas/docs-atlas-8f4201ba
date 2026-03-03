@@ -1,0 +1,257 @@
+---
+title: "ModuleCategories"
+description: "Defines all available module categories for organizing LiquidBounce features"
+---
+
+## Overview
+
+The `ModuleCategories` object manages the registration and retrieval of module categories. Categories organize modules into logical groups for better navigation and management.
+
+**Package:** `net.ccbluex.liquidbounce.features.module`
+
+## Object Declaration
+
+```kotlin
+object ModuleCategories
+```
+
+## Built-in Categories
+
+### COMBAT
+
+```kotlin
+@JvmField
+val COMBAT = register(ModuleCategory("Combat"))
+```
+
+Combat-related modules like KillAura, Velocity, AutoArmor, Criticals, etc.
+
+**Example Modules:**
+- KillAura - Automatic entity targeting and attacking
+- Velocity - Knockback modification
+- AutoArmor - Automatic armor management
+- Criticals - Critical hit manipulation
+- Backtrack - Lag compensation exploitation
+
+### PLAYER
+
+```kotlin
+@JvmField
+val PLAYER = register(ModuleCategory("Player"))
+```
+
+Player interaction and inventory modules.
+
+**Example Modules:**
+- ChestStealer - Automatic chest looting
+- InventoryCleaner - Auto-organize inventory
+- NoFall - Prevent fall damage
+- AutoRespawn - Auto-respawn on death
+- FastUse - Faster item usage
+
+### MOVEMENT
+
+```kotlin
+@JvmField
+val MOVEMENT = register(ModuleCategory("Movement"))
+```
+
+Movement enhancement modules.
+
+**Example Modules:**
+- Fly - Flight capabilities
+- Speed - Movement speed modification
+- Sprint - Omnidirectional sprint
+- Step - Automatic step-up
+- NoSlow - Prevent slowdown from items
+
+### RENDER
+
+```kotlin
+@JvmField
+val RENDER = register(ModuleCategory("Render"))
+```
+
+Visual enhancement and ESP modules.
+
+**Example Modules:**
+- ESP - Entity highlighting
+- Nametags - Enhanced player nametags
+- Tracers - Lines to entities
+- FullBright - Maximum brightness
+- HUD - Head-up display
+
+### WORLD
+
+```kotlin
+@JvmField
+val WORLD = register(ModuleCategory("World"))
+```
+
+World interaction modules.
+
+**Example Modules:**
+- Scaffold - Automatic block placement
+- Nuker - Automatic block breaking
+- FastBreak - Faster block breaking
+- CrystalAura - End crystal combat
+- Timer - Game speed manipulation
+
+### EXPLOIT
+
+```kotlin
+@JvmField
+val EXPLOIT = register(ModuleCategory("Exploit"))
+```
+
+Server exploit and bypass modules.
+
+**Example Modules:**
+- Disabler - Disable anticheat checks
+- Phase - Walk through blocks
+- AntiHunger - Reduce hunger consumption
+- PingSpoof - Fake network latency
+- Blink - Delayed packet sending
+
+### MISC
+
+```kotlin
+@JvmField
+val MISC = register(ModuleCategory("Misc"))
+```
+
+Miscellaneous utility modules.
+
+**Example Modules:**
+- AntiBot - Bot detection
+- Teams - Team detection
+- NameProtect - Hide player names
+- AutoConfig - Automatic config loading
+- BetterChat - Chat enhancements
+
+### FUN
+
+```kotlin
+@JvmField
+val FUN = register(ModuleCategory("Fun"))
+```
+
+Entertainment and cosmetic modules.
+
+**Example Modules:**
+- Derp - Random head rotation
+- SkinDerp - Randomize skin parts
+- Twerk - Sneak spam animation
+- Notebot - Play note block songs
+
+## Methods
+
+### entries
+
+```kotlin
+@JvmStatic
+val entries: Collection<ModuleCategory>
+```
+
+Returns all registered module categories in order.
+
+**Example:**
+```kotlin
+for (category in ModuleCategories.entries) {
+    println(category.tag)
+}
+```
+
+### byName
+
+```kotlin
+@JvmStatic
+fun byName(name: String): ModuleCategory?
+```
+
+Finds a category by name (case-insensitive).
+
+**Example:**
+```kotlin
+val combatCategory = ModuleCategories.byName("combat")
+```
+
+### register (private)
+
+```kotlin
+@JvmStatic
+private fun register(category: ModuleCategory): ModuleCategory
+```
+
+Registers a new category. Used internally during initialization.
+
+## ModuleCategory Class
+
+```kotlin
+class ModuleCategory(val tag: String)
+```
+
+<ParamField path="tag" type="String">
+  Display name of the category
+</ParamField>
+
+## Usage Examples
+
+### Filtering Modules by Category
+
+```kotlin
+val combatModules = ModuleManager.filter { 
+    it.category == ModuleCategories.COMBAT 
+}
+```
+
+### Creating Module with Category
+
+```kotlin
+object ModuleCustom : ClientModule(
+    name = "Custom",
+    category = ModuleCategories.MISC
+) {
+    // Module implementation
+}
+```
+
+### Iterating Categories
+
+```kotlin
+for (category in ModuleCategories.entries) {
+    val modules = ModuleManager.filter { it.category == category }
+    println("${category.tag}: ${modules.size} modules")
+}
+```
+
+### Category-Specific UI
+
+```kotlin
+fun drawCategoryPanel(category: ModuleCategory) {
+    val modules = ModuleManager.filter { it.category == category }
+    // Draw UI elements
+}
+```
+
+## Custom Categories
+
+<Warning>
+Adding custom categories requires modifying `ModuleCategories` during initialization. This is not recommended for plugins - use existing categories instead.
+</Warning>
+
+## Best Practices
+
+1. **Use appropriate category** - Choose the category that best fits your module's purpose
+2. **Combat for attack features** - Any module that directly affects combat
+3. **Movement for locomotion** - Anything that changes how the player moves
+4. **Render for visual** - Visual-only features without gameplay impact
+5. **World for block interaction** - Modules that interact with blocks
+6. **Exploit for bypasses** - Server-side exploits and antichat bypasses
+7. **Misc for utilities** - Helper modules that don't fit other categories
+8. **Fun for cosmetic** - Non-competitive features
+
+## See Also
+
+- [ModuleManager](/api/module-manager) - Module management system
+- [ClientModule](/api/client-module) - Base module class

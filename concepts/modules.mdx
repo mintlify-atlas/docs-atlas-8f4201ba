@@ -1,0 +1,261 @@
+---
+title: 'Modules'
+description: 'Understanding the module system in LiquidBounce'
+icon: 'cube'
+---
+
+## What are Modules?
+
+Modules (also called "hacks") are the core features of LiquidBounce. Each module provides specific functionality that can be enabled or disabled. Modules can handle events, respond to game actions, and modify player behavior.
+
+<Info>
+Modules are defined in `ClientModule.kt` and extend the `ToggleableValueGroup` class, making them event listeners that can be configured.
+</Info>
+
+## Module Categories
+
+LiquidBounce organizes modules into categories to help you find what you need. Each module belongs to one of these categories:
+
+<CardGroup cols={2}>
+  <Card title="Combat" icon="sword">
+    Modules that enhance combat capabilities, such as auto-aiming, criticals, and velocity modifications.
+  </Card>
+  <Card title="Movement" icon="person-running">
+    Modules that affect player movement, including speed, flight, and step modifications.
+  </Card>
+  <Card title="Player" icon="user">
+    Player-related modules like auto-armor, inventory management, and auto-tool.
+  </Card>
+  <Card title="Render" icon="eye">
+    Visual modules such as ESP, tracers, and HUD elements.
+  </Card>
+  <Card title="World" icon="globe">
+    World interaction modules including scaffold, auto-mine, and chest stealer.
+  </Card>
+  <Card title="Exploit" icon="bug">
+    Modules that exploit game mechanics or server vulnerabilities.
+  </Card>
+  <Card title="Misc" icon="ellipsis">
+    Miscellaneous utility modules that don't fit other categories.
+  </Card>
+  <Card title="Fun" icon="face-smile">
+    Entertainment modules for fun effects and animations.
+  </Card>
+</CardGroup>
+
+## Module States
+
+Modules have two important states:
+
+### Enabled State
+
+The enabled state determines whether a module is active. You can toggle modules on or off using:
+- The ClickGUI interface
+- Keybinds
+- Commands (`.toggle <module>`)
+
+### Running State
+
+The running state is separate from enabled. A module is running when:
+- It is enabled (or marked as `notActivatable`)
+- The player is in-game
+- The module hasn't been paused
+
+```kotlin
+override val running: Boolean
+    get() = super<EventListener>.running && inGame && (enabled || notActivatable)
+```
+
+<Note>
+Source: `ClientModule.kt:74-75`
+</Note>
+
+## Keybinds
+
+Every module can be assigned a keybind for quick access. The keybind system supports:
+
+- **Key Type**: Keyboard keys, mouse buttons, or other input types
+- **Bind Action**: What happens when the key is pressed (toggle, hold, etc.)
+
+Keybinds are stored in the module's `bindValue` property:
+
+```kotlin
+internal val bindValue = bind("Bind", InputBind(InputConstants.Type.KEYSYM, bind, bindAction))
+```
+
+<Note>
+Source: `ClientModule.kt:77`
+</Note>
+
+### Setting Keybinds
+
+You can set keybinds through:
+1. **ClickGUI**: Click the bind button in the module settings
+2. **Command**: Use `.bind <module> <key>`
+3. **Config Files**: Edit the configuration manually
+
+## Module Configuration
+
+Modules can have various configuration options called "values" or "settings". These allow you to customize how each module behaves.
+
+### Accessing Settings
+
+Modules expose their settings through the `settings` property:
+
+```kotlin
+open val settings by lazy { inner.associateBy { it.name } }
+```
+
+<Note>
+Source: `ClientModule.kt:110`
+</Note>
+
+### Value Types
+
+Modules support many types of configuration values:
+- **Boolean**: On/off toggles
+- **Integer/Float**: Numeric ranges
+- **Choice**: Selection from predefined options
+- **Text**: String input
+- **Color**: Color pickers
+- **Blocks/Items**: Minecraft object selections
+
+<Tip>
+Learn more about value types in the [Configuration](/concepts/configuration) page.
+</Tip>
+
+## Hidden Modules
+
+Modules can be hidden from the HUD arraylist while still being active. This is useful for modules you want to use discreetly.
+
+```kotlin
+var hidden by boolean("Hidden", hide)
+    .doNotIncludeWhen { !AutoConfig.includeConfiguration.includeHidden }
+    .independentDescription()
+```
+
+<Note>
+Source: `ClientModule.kt:86-88`
+</Note>
+
+Set a module as hidden using:
+- `.hide <module>` command
+- The "Hidden" setting in ClickGUI
+
+## Module Tags
+
+Some modules display a tag on the HUD arraylist showing their current configuration or state. For example:
+- **Speed**: "Vanilla" or "Custom"
+- **Flight**: Current mode
+- **KillAura**: Range setting
+
+Tags are defined by the module using the `tagBy()` method:
+
+```kotlin
+open val tag: String?
+    get() = this.tagValue?.getTagValue()?.toString()
+```
+
+<Note>
+Source: `ClientModule.kt:101-102`
+</Note>
+
+## Common Module Operations
+
+### Enable/Disable a Module
+
+<CodeGroup>
+```kotlin Programmatically
+// Enable a module
+module.enabled = true
+
+// Disable a module
+module.enabled = false
+
+// Toggle a module
+module.enabled = !module.enabled
+```
+
+```bash Command
+# Toggle a module
+.toggle KillAura
+
+# Short form
+.t Velocity
+```
+</CodeGroup>
+
+### Check if Module is Enabled
+
+```kotlin
+if (ModuleKillAura.enabled) {
+    // Module is enabled
+}
+```
+
+### Access Module Settings
+
+```kotlin
+val range = ModuleKillAura.range.get()
+ModuleKillAura.attackSpeed.set(15)
+```
+
+## Module Events
+
+Modules can react to game events by implementing event handlers. Common events include:
+
+- **Player Movement**: `PlayerMoveEvent`
+- **Packet Handling**: `PacketEvent`
+- **Rendering**: `ScreenRenderEvent`
+- **Combat**: `AttackEvent`
+
+When a module is enabled, it registers as an event listener. When disabled, it unregisters.
+
+## Not Activatable Modules
+
+Some modules cannot be toggled on/off in the traditional sense. These are marked with `notActivatable = true` and are always considered "running" when in-game.
+
+Examples include:
+- **ClickGUI**: The interface itself
+- **HUD**: Always-on display elements
+
+<Warning>
+Not activatable modules cannot be toggled using keybinds or the toggle command.
+</Warning>
+
+## Best Practices
+
+<Steps>
+  <Step title="Organize by Category">
+    Use the category system to quickly find modules you need
+  </Step>
+  <Step title="Use Keybinds">
+    Set keybinds for frequently used modules for quick access
+  </Step>
+  <Step title="Configure Settings">
+    Customize module settings to match your playstyle and server requirements
+  </Step>
+  <Step title="Hide When Needed">
+    Hide modules from the arraylist for a cleaner HUD or discretion
+  </Step>
+  <Step title="Use Auto-Config">
+    Load server-specific configurations for optimal performance
+  </Step>
+</Steps>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Commands" icon="terminal" href="/concepts/commands">
+    Learn about the command system for controlling modules
+  </Card>
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Understand how configuration and values work
+  </Card>
+  <Card title="Scripting" icon="code" href="/concepts/scripting">
+    Create custom modules using scripts
+  </Card>
+  <Card title="ClickGUI" icon="window" href="/modules/render">
+    Using the ClickGUI to manage modules
+  </Card>
+</CardGroup>

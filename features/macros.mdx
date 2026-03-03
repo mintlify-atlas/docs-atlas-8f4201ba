@@ -1,0 +1,471 @@
+---
+title: Macros & Keybinds
+description: Customize keyboard and mouse bindings for modules and commands
+icon: keyboard
+---
+
+# Macros & Keybinds
+
+LiquidBounce features a sophisticated keybind system that allows you to bind keyboard keys and mouse buttons to modules and commands. The system supports multiple bind actions, modifiers, and complex key combinations.
+
+## Overview
+
+The keybind system provides:
+
+<CardGroup cols={2}>
+  <Card title="Flexible Bindings" icon="key">
+    Bind keyboard keys, mouse buttons, and scancodes
+  </Card>
+  <Card title="Bind Actions" icon="toggle-on">
+    Toggle, Hold, or Smart activation modes
+  </Card>
+  <Card title="Modifiers" icon="command">
+    Support for Shift, Ctrl, Alt, and Super modifiers
+  </Card>
+  <Card title="Module Integration" icon="puzzle-piece">
+    Every module has a configurable keybind
+  </Card>
+</CardGroup>
+
+## InputBind Structure
+
+The core of the keybind system is the `InputBind` class:
+
+```kotlin
+data class InputBind(
+    val boundKey: InputConstants.Key,
+    val action: BindAction,
+    val modifiers: Set<Modifier>,
+)
+```
+
+### Components
+
+- **boundKey**: The key or button to bind (keyboard key, mouse button, or scancode)
+- **action**: How the bind behaves (Toggle, Hold, or Smart)
+- **modifiers**: Required modifier keys (Shift, Ctrl, Alt, Super)
+
+## Bind Actions
+
+Three bind action modes are available:
+
+<Tabs>
+  <Tab title="Toggle">
+    Flips the state when pressed:
+    
+    ```kotlin
+    BindAction.TOGGLE
+    ```
+    
+    - Press once: Enable
+    - Press again: Disable
+    - Most common for modules
+  </Tab>
+  
+  <Tab title="Hold">
+    Enabled only while key is held:
+    
+    ```kotlin
+    BindAction.HOLD
+    ```
+    
+    - Press: Enable
+    - Release: Disable immediately
+    - Useful for temporary actions
+  </Tab>
+  
+  <Tab title="Smart">
+    Adaptive behavior based on usage:
+    
+    ```kotlin
+    BindAction.SMART
+    ```
+    
+    - Quick tap: Toggle
+    - Hold down: Acts like Hold mode
+    - Best of both worlds
+  </Tab>
+</Tabs>
+
+### Implementation
+
+From InputBind.kt:181:
+
+```kotlin
+fun getNewState(event: KeyboardKeyEvent, currentState: Boolean): Boolean {
+    if (!matchesKey(event.keyCode, event.scanCode)) {
+        return currentState
+    }
+    
+    val eventAction = event.action
+    return when (eventAction) {
+        GLFW.GLFW_PRESS if mc.screen == null -> when (action) {
+            BindAction.TOGGLE -> !currentState
+            BindAction.HOLD, BindAction.SMART -> true
+        }
+        GLFW.GLFW_RELEASE -> when (action) {
+            BindAction.HOLD -> false
+            BindAction.TOGGLE, BindAction.SMART -> currentState
+        }
+        else -> currentState
+    }
+}
+```
+
+<Info>
+Binds only activate when no screen is open (prevents conflict with menus).
+</Info>
+
+## Modifiers
+
+Supported modifier keys:
+
+```kotlin
+enum class Modifier(
+    override val tag: String,
+    val bitMask: Int,
+    vararg val keyCodes: Int
+): Tagged {
+    SHIFT("Shift", GLFW.GLFW_MOD_SHIFT, KEY_LSHIFT, KEY_RSHIFT),
+    CONTROL("Control", GLFW.GLFW_MOD_CONTROL, KEY_LCONTROL, KEY_RCONTROL),
+    ALT("Alt", GLFW.GLFW_MOD_ALT, KEY_LALT, KEY_RALT),
+    SUPER("Super", GLFW.GLFW_MOD_SUPER, KEY_LSUPER, KEY_RSUPER)
+}
+```
+
+### Platform-Specific Names
+
+Modifiers show platform-appropriate symbols:
+
+```kotlin
+val platformRenderName: String get() = when (Util.getPlatform()) {
+    Util.OS.WINDOWS -> when (this) {
+        CONTROL -> "Ctrl"
+        SUPER -> "⊞"  // Windows key
+        else -> tag
+    }
+    Util.OS.OSX -> when (this) {
+        SHIFT -> "⇧"
+        CONTROL -> "^"
+        ALT -> "⌥"
+        SUPER -> "⌘"  // Command key
+    }
+    else -> tag
+}
+```
+
+### Checking Modifiers
+
+Check if required modifiers are active:
+
+```kotlin
+fun matchesModifiers(mods: Int): Boolean {
+    return this.modifiers.all { it.isActive(mods) }
+}
+
+fun Modifier.isActive(modifiers: Int) = 
+    modifiers and this.bitMask != 0
+```
+
+## Creating Bindings
+
+### Basic Bind
+
+```kotlin
+// Bind to a specific key
+val bind = InputBind(
+    InputConstants.Type.KEYSYM,
+    GLFW.GLFW_KEY_R,
+    BindAction.TOGGLE
+)
+
+// Bind by name
+val bind = InputBind("key.keyboard.r")
+```
+
+### Bind with Modifiers
+
+```kotlin
+// Ctrl+R
+val bind = InputBind(
+    boundKey = InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_R),
+    action = BindAction.TOGGLE,
+    modifiers = setOf(InputBind.Modifier.CONTROL)
+)
+
+// Shift+Alt+F
+val bind = InputBind(
+    boundKey = InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_F),
+    action = BindAction.HOLD,
+    modifiers = setOf(
+        InputBind.Modifier.SHIFT,
+        InputBind.Modifier.ALT
+    )
+)
+```
+
+### Mouse Bindings
+
+```kotlin
+// Right mouse button
+val bind = InputBind(
+    InputConstants.Type.MOUSE,
+    GLFW.GLFW_MOUSE_BUTTON_RIGHT,
+    BindAction.TOGGLE
+)
+
+// Middle mouse + Ctrl
+val bind = InputBind(
+    boundKey = InputConstants.Type.MOUSE.getOrCreate(GLFW.GLFW_MOUSE_BUTTON_MIDDLE),
+    action = BindAction.HOLD,
+    modifiers = setOf(InputBind.Modifier.CONTROL)
+)
+```
+
+## Module Integration
+
+Every `ClientModule` has a keybind:
+
+```kotlin
+open class ClientModule(
+    name: String,
+    category: ModuleCategory,
+    bind: Int = InputConstants.UNKNOWN.value,
+    bindAction: BindAction = BindAction.TOGGLE,
+    state: Boolean = false,
+    // ...
+) {
+    internal val bindValue = bind("Bind", InputBind(
+        InputConstants.Type.KEYSYM,
+        bind,
+        bindAction
+    ))
+    val bind get() = bindValue.get()
+}
+```
+
+### Module Keybind Usage
+
+```kotlin
+// Access module's bind
+val flyBind = ModuleFly.bind
+
+// Modify module's bind
+ModuleFly.bindValue.bind("key.keyboard.f")
+
+// Set bind with modifiers
+ModuleFly.bindValue.bind(
+    key = InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_V),
+    action = BindAction.HOLD,
+    modifiers = setOf(InputBind.Modifier.CONTROL)
+)
+
+// Unbind
+ModuleFly.bindValue.unbind()
+```
+
+## Event Matching
+
+The system matches events to bindings:
+
+### Keyboard Events
+
+```kotlin
+// Check if key press matches
+fun matchesKeyPress(event: KeyboardKeyEvent): Boolean {
+    return event.action == GLFW.GLFW_PRESS
+        && matchesKey(event.keyCode, event.scanCode)
+        && matchesModifiers(event.mods)
+}
+
+// Check if release affects this bind
+fun matchesKeyRelease(event: KeyboardKeyEvent): Boolean {
+    if (event.action != GLFW.GLFW_RELEASE) return false
+    
+    val keyReleased = matchesKey(event.keyCode, event.scanCode)
+    val modifierReleased = event.key.toModifierOrNull()
+        .let { it in modifiers && !it!!.isAnyPressed }
+    
+    return keyReleased || modifierReleased
+}
+```
+
+### Mouse Events
+
+```kotlin
+// Check if mouse press matches
+fun matchesMousePress(event: MouseButtonEvent): Boolean {
+    return event.action == GLFW.GLFW_PRESS
+        && matchesMouse(event.button)
+        && matchesModifiers(event.mods)
+}
+
+// Check if release affects this bind
+fun matchesMouseRelease(event: MouseButtonEvent): Boolean {
+    if (event.action != GLFW.GLFW_RELEASE) return false
+    
+    val buttonReleased = matchesMouse(event.button)
+    val modifierReleased = event.key.toModifierOrNull()
+        .let { it in modifiers && !it!!.isAnyPressed }
+    
+    return buttonReleased || modifierReleased
+}
+```
+
+<Note>
+Releasing a required modifier also deactivates the bind in Hold mode.
+</Note>
+
+## Helper Functions
+
+### Bind Management
+
+```kotlin
+// Bind to a named key
+fun Value<InputBind>.bind(name: String) = 
+    set(get().copy(boundKey = inputByName(name)))
+
+// Bind with full configuration
+fun Value<InputBind>.bind(
+    key: InputConstants.Key,
+    action: BindAction,
+    modifiers: Set<Modifier>
+) = set(get().copy(
+    boundKey = key,
+    action = action,
+    modifiers = modifiers
+))
+
+// Unbind
+fun Value<InputBind>.unbind() = set(InputBind.UNBOUND)
+```
+
+### Rendering
+
+Generate display text for a bind:
+
+```kotlin
+fun InputBind.renderText(): Component = buildList {
+    // Main key
+    add(variable(boundKey.displayName).bold())
+    
+    // Modifiers
+    if (modifiers.isNotEmpty()) {
+        modifiers.forEach {
+            add(regular(" + "))
+            add(variable(it.platformRenderName))
+        }
+    }
+    
+    // Action type
+    add(regular(" ("))
+    add(variable(action.tag))
+    add(regular(")"))
+}.asText()
+```
+
+Output examples:
+- `R (Toggle)`
+- `Ctrl + V (Hold)`
+- `Shift + Alt + F (Smart)`
+
+## Special Keys
+
+### Unbound Key
+
+```kotlin
+companion object {
+    @JvmField
+    val UNBOUND = InputBind(
+        InputConstants.UNKNOWN,
+        BindAction.TOGGLE,
+        emptySet()
+    )
+}
+
+val isUnbound: Boolean
+    get() = this.boundKey == InputConstants.UNKNOWN
+```
+
+### Key Names
+
+```kotlin
+val keyName: String
+    get() = when {
+        isUnbound -> "None"
+        else -> this.boundKey.name
+            .split('.')
+            .drop(2)  // Drop "key.keyboard" or "key.mouse"
+            .joinToString(separator = "_")
+            .uppercase()
+    }
+```
+
+Examples:
+- `key.keyboard.r` → `R`
+- `key.mouse.left` → `LEFT`
+- `key.keyboard.left.shift` → `LEFT_SHIFT`
+
+## Configuration
+
+Binds are stored in module configurations:
+
+```json
+{
+  "Fly": {
+    "Bind": {
+      "key": "key.keyboard.f",
+      "action": "Toggle",
+      "modifiers": []
+    }
+  },
+  "Sprint": {
+    "Bind": {
+      "key": "key.keyboard.v",
+      "action": "Hold",
+      "modifiers": ["Control"]
+    }
+  }
+}
+```
+
+## Code References
+
+<CardGroup cols={2}>
+  <Card title="InputBind.kt" icon="file-code">
+    Complete keybind system - line 51
+    <br/>`utils/input/InputBind.kt` (339 lines)
+  </Card>
+  <Card title="ClientModule.kt" icon="puzzle-piece">
+    Module bind integration - line 77
+    <br/>`features/module/ClientModule.kt`
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Choose Appropriate Actions">
+    Use Toggle for permanent states, Hold for temporary actions, Smart for flexibility
+  </Step>
+  
+  <Step title="Avoid Conflicts">
+    Check for existing binds before assigning to prevent conflicts
+  </Step>
+  
+  <Step title="Use Modifiers Wisely">
+    Modifiers allow more binds without conflicts, but too many make them hard to use
+  </Step>
+  
+  <Step title="Consider Vanilla Binds">
+    Avoid overriding important vanilla Minecraft keybinds
+  </Step>
+  
+  <Step title="Platform Compatibility">
+    Test binds on different platforms as some keys may not be available
+  </Step>
+  
+  <Step title="Document Custom Binds">
+    If creating macros, document the key combinations for users
+  </Step>
+</Steps>

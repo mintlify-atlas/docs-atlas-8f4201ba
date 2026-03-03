@@ -1,0 +1,654 @@
+---
+title: 'Scripting'
+description: 'Extend LiquidBounce with custom scripts using GraalVM'
+icon: 'code'
+---
+
+## What is the Scripting System?
+
+The scripting system allows you to extend LiquidBounce's functionality by writing custom scripts at runtime. You can create custom modules, commands, and integrate with LiquidBounce's API without modifying the client's source code.
+
+<Info>
+LiquidBounce uses GraalVM Polyglot to support multiple programming languages including JavaScript, Python, Ruby, and more.
+</Info>
+
+## GraalVM Polyglot Support
+
+GraalVM is a high-performance runtime that supports multiple languages. LiquidBounce leverages this to provide flexible scripting capabilities:
+
+```kotlin
+val engine = Engine.create()
+logger.info(
+    "[ScriptAPI] Engine Version: ${engine.version}, " +
+        "Supported languages: [ ${engine.languages.keys.joinToString(", ")} ]"
+)
+```
+
+<Note>
+Source: `ScriptManager.kt:62-66`
+</Note>
+
+### Supported Languages
+
+Depending on your GraalVM installation, you can use:
+
+<CardGroup cols={2}>
+  <Card title="JavaScript" icon="js">
+    Most commonly used, excellent documentation
+  </Card>
+  <Card title="Python" icon="python">
+    Familiar syntax for Python developers
+  </Card>
+  <Card title="Ruby" icon="gem">
+    Elegant and expressive scripting
+  </Card>
+  <Card title="R" icon="chart-line">
+    Statistical computing and data analysis
+  </Card>
+</CardGroup>
+
+<Warning>
+Additional languages may require installing GraalVM language components separately.
+</Warning>
+
+## Script Location
+
+Scripts are stored in the scripts directory within your LiquidBounce folder:
+
+```kotlin
+val root = File(ConfigSystem.rootFolder, "scripts").apply {
+    if (!exists()) {
+        mkdir()
+    }
+}
+```
+
+<Note>
+Source: `ScriptManager.kt:52-56`
+</Note>
+
+### Directory Structure
+
+```
+LiquidBounce/
+└── scripts/
+    ├── my-script.js          # Single file script
+    ├── complex-script/       # Directory-based script
+    │   ├── main.js          # Entry point (must be named 'main')
+    │   ├── utils.js         # Additional files
+    │   └── config.json      # Script configuration
+    └── marketplace-script/  # Installed from marketplace
+        └── main.js
+```
+
+### Main File Requirement
+
+For directory-based scripts, you must have a file named `main` with the appropriate extension:
+
+```kotlin
+val mainFile = file.listFiles { dirFile ->
+    dirFile.nameWithoutExtension == "main" && Source.findLanguage(dirFile) != null
+}?.firstOrNull()
+```
+
+<Note>
+Source: `ScriptManager.kt:85-87`
+</Note>
+
+## Script Lifecycle
+
+Scripts go through several lifecycle stages:
+
+<Steps>
+  <Step title="Loading">
+    Scripts are discovered and loaded from the scripts directory
+  </Step>
+  <Step title="Initialization">
+    The script's main code is executed and objects are created
+  </Step>
+  <Step title="Enabling">
+    Script modules/features are registered with LiquidBounce
+  </Step>
+  <Step title="Running">
+    Script code executes and responds to events
+  </Step>
+  <Step title="Disabling">
+    Script features are unregistered when disabled
+  </Step>
+  <Step title="Unloading">
+    Script is completely removed from memory
+  </Step>
+</Steps>
+
+### Loading Scripts
+
+```kotlin
+fun loadAll() {
+    require(isInitialized) { "Cannot load scripts before the script engine is initialized." }
+    val files = root.listFiles { file ->
+        Source.findLanguage(file) != null || file.isDirectory
+    } + MarketplaceManager.getSubscribedItemsOfType(MarketplaceItemType.SCRIPT).map { item ->
+        item.getInstallationFolder()
+    }
+    
+    files.forEach { file ->
+        // Load logic...
+    }
+    
+    enableAll()
+}
+```
+
+<Note>
+Source: `ScriptManager.kt:74-102`
+</Note>
+
+### Unloading Scripts
+
+```kotlin
+fun unloadAll() {
+    scripts.forEach(PolyglotScript::disable)
+    scripts.forEach(PolyglotScript::close)
+    scripts.clear()
+    ScriptAsyncUtil.TickScheduler.clear()
+    ScriptContextProvider.cleanup()
+}
+```
+
+<Note>
+Source: `ScriptManager.kt:107-113`
+</Note>
+
+## Script API Overview
+
+LiquidBounce provides a rich API for scripts to interact with the client:
+
+### Core API Categories
+
+<AccordionGroup>
+  <Accordion title="Module API">
+    Create custom modules with events and settings
+    
+    ```javascript
+    var myModule = {
+        name: "CustomKillAura",
+        category: "Combat",
+        description: "My custom kill aura",
+        
+        settings: {
+            range: floatValue("Range", 4.0, 3.0, 6.0),
+            speed: intValue("Speed", 10, 1, 20)
+        },
+        
+        onEnable: function() {
+            chat("Module enabled!");
+        },
+        
+        onDisable: function() {
+            chat("Module disabled!");
+        },
+        
+        onUpdate: function() {
+            // Your update logic here
+        }
+    };
+    
+    moduleManager.registerModule(myModule);
+    ```
+  </Accordion>
+  
+  <Accordion title="Command API">
+    Create custom commands
+    
+    ```javascript
+    var myCommand = {
+        name: "test",
+        aliases: ["t"],
+        
+        execute: function(args) {
+            chat("Test command executed!");
+            chat("Arguments: " + args.join(", "));
+        }
+    };
+    
+    commandManager.registerCommand(myCommand);
+    ```
+  </Accordion>
+  
+  <Accordion title="Event API">
+    Listen to game events
+    
+    ```javascript
+    events.on("Update", function(event) {
+        // Runs every tick
+    });
+    
+    events.on("Attack", function(event) {
+        // Runs when attacking
+        var target = event.target;
+    });
+    
+    events.on("Packet", function(event) {
+        // Intercept packets
+        if (event.packet instanceof C03PacketPlayer) {
+            // Handle player packet
+        }
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Player API">
+    Access player information and controls
+    
+    ```javascript
+    // Get player position
+    var x = player.posX;
+    var y = player.posY;
+    var z = player.posZ;
+    
+    // Check player state
+    var isOnGround = player.onGround;
+    var health = player.health;
+    
+    // Control player
+    player.jump();
+    player.swingItem();
+    ```
+  </Accordion>
+  
+  <Accordion title="World API">
+    Interact with the world
+    
+    ```javascript
+    // Get blocks
+    var block = world.getBlockAt(x, y, z);
+    
+    // Get entities
+    var entities = world.getLoadedEntities();
+    
+    // World information
+    var worldTime = world.getWorldTime();
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Script API Access
+
+Modules expose settings through the Script API:
+
+```kotlin
+@ScriptApiRequired
+open val settings by lazy { inner.associateBy { it.name } }
+```
+
+<Note>
+Source: `ClientModule.kt:109-110`
+</Note>
+
+The `@ScriptApiRequired` annotation marks members that are exposed to scripts.
+
+## Async Operations
+
+Scripts can perform async operations using the tick scheduler:
+
+```javascript
+// Schedule task for next tick
+schedule(function() {
+    chat("This runs next tick!");
+});
+
+// Schedule delayed task
+scheduleDelayed(function() {
+    chat("This runs after 20 ticks (1 second)");
+}, 20);
+
+// Schedule repeating task
+scheduleRepeating(function() {
+    chat("This runs every second");
+}, 0, 20);
+```
+
+## Value Types in Scripts
+
+Scripts can create various value types for module settings:
+
+<Tabs>
+  <Tab title="Boolean">
+    ```javascript
+    var enabled = booleanValue("Enabled", true);
+    
+    // Access
+    if (enabled.get()) {
+        // Do something
+    }
+    
+    // Set
+    enabled.set(false);
+    ```
+  </Tab>
+  
+  <Tab title="Integer">
+    ```javascript
+    var speed = intValue("Speed", 10, 1, 20);
+    // name, default, min, max
+    
+    var currentSpeed = speed.get();
+    speed.set(15);
+    ```
+  </Tab>
+  
+  <Tab title="Float">
+    ```javascript
+    var range = floatValue("Range", 4.0, 3.0, 6.0);
+    
+    var currentRange = range.get();
+    range.set(4.5);
+    ```
+  </Tab>
+  
+  <Tab title="Text">
+    ```javascript
+    var message = textValue("Message", "Hello World");
+    
+    var text = message.get();
+    message.set("New message");
+    ```
+  </Tab>
+  
+  <Tab title="Choice">
+    ```javascript
+    var mode = listValue("Mode", ["Vanilla", "Custom", "AAC"], "Vanilla");
+    
+    var currentMode = mode.get();
+    mode.set("Custom");
+    ```
+  </Tab>
+</Tabs>
+
+### Setting Value Programmatically
+
+The Script API supports setting values from polyglot values:
+
+```kotlin
+@ScriptApiRequired
+@JvmName("setValue")
+fun setValue(t: PolyglotValue) = runCatching {
+    set(
+        when (inner) {
+            is Float -> t.asDouble().toFloat() as T
+            is Int -> t.asInt() as T
+            is String -> t.asString() as T
+            is Boolean -> t.asBoolean() as T
+            else -> error("Unsupported value type $inner")
+        }
+    )
+}
+```
+
+<Note>
+Source: `Value.kt:183-218`
+</Note>
+
+## Managing Scripts
+
+### Via Commands
+
+<CodeGroup>
+```bash Load Scripts
+# Reload all scripts
+.script reload
+
+# This will:
+# - Unload all current scripts
+# - Scan the scripts directory
+# - Load and enable all found scripts
+```
+
+```bash List Scripts
+# List all loaded scripts
+.script list
+
+# Shows:
+# - Script name
+# - Language
+# - Status (enabled/disabled)
+```
+
+```bash Enable/Disable
+# Enable a script
+.script enable myscript
+
+# Disable a script
+.script disable myscript
+```
+</CodeGroup>
+
+### Via Code
+
+```kotlin
+// Load a specific script
+val script = ScriptManager.loadScript(
+    file = File("path/to/script.js"),
+    language = "js"
+)
+
+// Unload a script
+ScriptManager.unloadScript(script)
+
+// Reload all scripts
+ScriptManager.reload()
+```
+
+## Script Debug Options
+
+Scripts support debug options for development:
+
+```kotlin
+fun loadScript(
+    file: File,
+    language: String = Source.findLanguage(file),
+    debugOptions: ScriptDebugOptions = ScriptDebugOptions()
+): PolyglotScript
+```
+
+<Note>
+Source: `ScriptManager.kt:135-139`
+</Note>
+
+## Marketplace Integration
+
+Scripts can be installed from the LiquidBounce marketplace:
+
+```kotlin
+val files = root.listFiles { file ->
+    Source.findLanguage(file) != null || file.isDirectory
+} + MarketplaceManager.getSubscribedItemsOfType(MarketplaceItemType.SCRIPT).map { item ->
+    item.getInstallationFolder()
+}
+```
+
+<Note>
+Source: `ScriptManager.kt:76-80`
+</Note>
+
+<Tip>
+Use the `.marketplace` command to browse and install community scripts!
+</Tip>
+
+## Example Scripts
+
+### Simple Kill Aura
+
+```javascript
+var KillAura = {
+    name: "ScriptKillAura",
+    description: "A simple kill aura script",
+    category: "Combat",
+    
+    settings: {
+        range: floatValue("Range", 4.0, 3.0, 6.0),
+        autoBlock: booleanValue("AutoBlock", true)
+    },
+    
+    onEnable: function() {
+        chat("Kill Aura enabled");
+    },
+    
+    onUpdate: function() {
+        var range = this.settings.range.get();
+        var entities = world.getLoadedEntities();
+        
+        for (var i = 0; i < entities.length; i++) {
+            var entity = entities[i];
+            var distance = player.getDistanceToEntity(entity);
+            
+            if (distance <= range && isValidTarget(entity)) {
+                player.attackEntity(entity);
+                break;
+            }
+        }
+    }
+};
+
+moduleManager.registerModule(KillAura);
+```
+
+### Custom Command
+
+```javascript
+var WelcomeCommand = {
+    name: "welcome",
+    description: "Sends a welcome message",
+    aliases: ["w", "hi"],
+    
+    execute: function(args) {
+        if (args.length > 0) {
+            var name = args.join(" ");
+            chat("Welcome, " + name + "!");
+        } else {
+            chat("Welcome to LiquidBounce!");
+        }
+    }
+};
+
+commandManager.registerCommand(WelcomeCommand);
+```
+
+### Event Listener
+
+```javascript
+var PacketLogger = {
+    name: "PacketLogger",
+    description: "Logs all packets",
+    category: "Misc",
+    
+    onEnable: function() {
+        this.packetListener = events.on("Packet", function(event) {
+            var packet = event.packet;
+            console.log("Packet: " + packet.getClass().getName());
+        });
+    },
+    
+    onDisable: function() {
+        events.off(this.packetListener);
+    }
+};
+
+moduleManager.registerModule(PacketLogger);
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Start Simple">
+    Begin with simple scripts and gradually add complexity
+  </Step>
+  <Step title="Use Proper Names">
+    Give your scripts descriptive names that indicate their purpose
+  </Step>
+  <Step title="Handle Errors">
+    Use try-catch blocks to prevent scripts from crashing
+  </Step>
+  <Step title="Clean Up Resources">
+    Unregister event listeners in onDisable to prevent memory leaks
+  </Step>
+  <Step title="Test Thoroughly">
+    Test scripts in single-player before using on servers
+  </Step>
+  <Step title="Document Your Code">
+    Add comments explaining what your script does
+  </Step>
+</Steps>
+
+## Performance Considerations
+
+<Warning>
+Scripts run in the game's main thread. Heavy operations can cause lag.
+</Warning>
+
+### Tips for Performance
+
+- Avoid complex calculations in frequently called events (like `onUpdate`)
+- Cache values when possible instead of recalculating
+- Use conditional checks to skip unnecessary work
+- Consider using tick delays for non-critical operations
+- Profile your scripts to identify bottlenecks
+
+## Security
+
+<Warning>
+Only load scripts from trusted sources. Scripts have full access to the client and can potentially be malicious.
+</Warning>
+
+### Safe Script Practices
+
+- Review script code before loading
+- Use scripts from the official marketplace when possible
+- Be cautious with scripts that:
+  - Access the file system
+  - Make network requests
+  - Execute system commands
+  - Modify game files
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Script Not Loading">
+    - Check if the file extension is supported
+    - Verify GraalVM has the language installed
+    - Look for syntax errors in the console
+    - Ensure the script is in the correct directory
+    - For directories, verify the main file exists
+  </Accordion>
+  
+  <Accordion title="Script Errors">
+    - Read the error message in console
+    - Check if you're using the correct API methods
+    - Verify all required modules are loaded
+    - Test the script in isolation
+  </Accordion>
+  
+  <Accordion title="Performance Issues">
+    - Check if the script is doing too much in update events
+    - Use profiling to identify slow operations
+    - Consider optimizing or splitting the script
+    - Disable other scripts to isolate the issue
+  </Accordion>
+</AccordionGroup>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Modules" icon="cube" href="/concepts/modules">
+    Understand modules that scripts can extend
+  </Card>
+  <Card title="Commands" icon="terminal" href="/concepts/commands">
+    Create custom commands with scripts
+  </Card>
+  <Card title="Configuration" icon="gear" href="/concepts/configuration">
+    Access configuration from scripts
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/module-manager">
+    Full Script API documentation
+  </Card>
+</CardGroup>

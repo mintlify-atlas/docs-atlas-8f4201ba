@@ -1,0 +1,348 @@
+---
+title: "EventListener"
+description: "Interface for objects that can handle events with lifecycle management"
+---
+
+## Overview
+
+The `EventListener` interface enables objects to register and handle events. It provides lifecycle management and integrates with the parent-child hierarchy system.
+
+**Package:** `net.ccbluex.liquidbounce.event`
+
+## Interface Declaration
+
+```kotlin
+interface EventListener : DebuggedOwner
+```
+
+## Properties
+
+<ParamField path="running" type="Boolean">
+  Whether the listener is actively processing events.
+  
+  ```kotlin
+  val running: Boolean
+      get() = parent()?.running ?: !isDestructed
+  ```
+  
+  Handlers only execute when `running` is true.
+</ParamField>
+
+## Methods
+
+<ParamField path="parent()" type="fun parent(): EventListener?">
+  Returns the parent event listener in the hierarchy.
+  
+  ```kotlin
+  fun parent(): EventListener?
+  ```
+  
+  **Default:** `null`
+  
+  Used to inherit running state from parent.
+</ParamField>
+
+<ParamField path="children()" type="fun children(): List<EventListener>">
+  Returns child event listeners.
+  
+  ```kotlin
+  fun children(): List<EventListener>
+  ```
+  
+  **Default:** `emptyList()`
+  
+  Children are unregistered when parent is unregistered.
+</ParamField>
+
+<ParamField path="unregister()" type="fun unregister()">
+  Unregisters all event handlers and children.
+  
+  ```kotlin
+  fun unregister()
+  ```
+  
+  This decision is final - handlers cannot be restored.
+</ParamField>
+
+## Creating Event Handlers
+
+### handler
+
+```kotlin
+inline fun <reified T : Event> EventListener.handler(
+    priority: Short = 0,
+    handler: Consumer<T>
+): EventHook<T>
+```
+
+Registers a standard event handler.
+
+**Example:**
+```kotlin
+private val tickHandler = handler<GameTickEvent> { event ->
+    // Handle tick
+}
+```
+
+### once
+
+```kotlin
+inline fun <reified T : Event> EventListener.once(
+    priority: Short = 0,
+    crossinline handler: (T) -> Unit
+): EventHook<T>
+```
+
+Registers a handler that executes once then unregisters.
+
+**Example:**
+```kotlin
+private val onceHandler = once<PlayerJumpEvent> { event ->
+    chat("First jump detected!")
+}
+```
+
+### repeated
+
+```kotlin
+inline fun <reified T : Event> EventListener.repeated(
+    times: Int = 1,
+    priority: Short = 1,
+    crossinline handler: (T) -> Unit
+): EventHook<T>
+```
+
+Registers a handler that executes a specific number of times.
+
+**Example:**
+```kotlin
+private val repeatedHandler = repeated<GameTickEvent>(times = 100) { event ->
+    // Runs exactly 100 times
+}
+```
+
+### until
+
+```kotlin
+inline fun <reified T : Event> EventListener.until(
+    priority: Short = 0,
+    crossinline handler: (T) -> Boolean
+): EventHook<T>
+```
+
+Registers a handler that runs until it returns true.
+
+**Example:**
+```kotlin
+var count = 0
+private val untilHandler = until<GameTickEvent> { event ->
+    count++
+    count >= 100 // Stop after 100 ticks
+}
+```
+
+### computedOn
+
+```kotlin
+inline fun <reified E : Event, V> EventListener.computedOn(
+    initialValue: V,
+    priority: Short = 0,
+    crossinline accumulator: (event: E, prev: V) -> V
+): ReadWriteProperty<EventListener, V>
+```
+
+Creates a delegated property that updates on events.
+
+**Example:**
+```kotlin
+var ticksSinceEnabled by computedOn<GameTickEvent, Int>(0) { event, prev ->
+    prev + 1
+}
+
+fun onEnable() {
+    ticksSinceEnabled = 0 // Reset
+}
+```
+
+## Implementing EventListener
+
+### Basic Implementation
+
+```kotlin
+object MyFeature : EventListener {
+    private val tickHandler = handler<GameTickEvent> {
+        // Handle event
+    }
+    
+    override val running: Boolean
+        get() = true // Always running
+}
+```
+
+### With Parent
+
+```kotlin
+class SubFeature(val parentModule: ClientModule) : EventListener {
+    private val handler = handler<GameTickEvent> {
+        // Only runs when parent module is running
+    }
+    
+    override fun parent() = parentModule
+}
+```
+
+### With Children
+
+```kotlin
+object ParentFeature : EventListener {
+    private val child1 = ChildFeature1()
+    private val child2 = ChildFeature2()
+    
+    override fun children() = listOf(child1, child2)
+    
+    // When ParentFeature.unregister() is called,
+    // child1 and child2 are also unregistered
+}
+```
+
+### With Toggle State
+
+```kotlin
+object ToggleableFeature : EventListener {
+    var enabled = false
+    
+    private val tickHandler = handler<GameTickEvent> {
+        // Only runs when enabled
+    }
+    
+    override val running: Boolean
+        get() = enabled
+}
+```
+
+## Usage in Modules
+
+All `ClientModule` instances implement `EventListener`:
+
+```kotlin
+object ModuleExample : ClientModule(
+    name = "Example",
+    category = ModuleCategories.MISC
+) {
+    // Handlers automatically respect module enabled state
+    private val tickHandler = handler<GameTickEvent> {
+        // Only runs when module is enabled and in-game
+    }
+    
+    override val running: Boolean
+        get() = super<EventListener>.running && inGame && enabled
+}
+```
+
+## Sequence Handlers
+
+For coroutine-based handlers:
+
+```kotlin
+private val sequenceHandler = sequenceHandler<GameTickEvent> { event ->
+    // Can use suspend functions
+    delay(1000)
+    
+    // Wait for specific condition
+    waitUntil { condition }
+    
+    // Wait for ticks
+    waitTicks(20)
+}
+```
+
+## Tick Handlers
+
+Simplified tick event handler:
+
+```kotlin
+private val tickHandler = tickHandler {
+    // Called every tick
+    // Automatically uses GameTickEvent
+}
+```
+
+## Handler Lifecycle
+
+```kotlin
+object MyModule : ClientModule(...) {
+    private val handler = handler<GameTickEvent> {
+        // Handler lifecycle:
+        // 1. Registered when field is initialized
+        // 2. Runs when `running` is true
+        // 3. Unregistered when module.unregister() is called
+    }
+    
+    override fun onDisable() {
+        // Handler still registered but won't run (running = false)
+    }
+}
+```
+
+## Best Practices
+
+1. **Store handlers as fields** - Prevents garbage collection
+2. **Implement `running` properly** - Controls when handlers execute
+3. **Use parent/child hierarchy** - Automatic lifecycle management
+4. **Unregister when no longer needed** - Frees resources
+5. **Handle errors in handlers** - Errors are logged but don't crash
+6. **Use specific event types** - More efficient than generic events
+7. **Consider handler frequency** - Some events fire very often
+
+## Common Patterns
+
+### Conditional Handler
+
+```kotlin
+val enabled by boolean("Enabled", true)
+
+private val handler = handler<GameTickEvent> {
+    if (!enabled) return@handler
+    // Handler logic
+}
+```
+
+### Delayed Initialization
+
+```kotlin
+private lateinit var handler: EventHook<GameTickEvent>
+
+fun initialize() {
+    handler = handler<GameTickEvent> {
+        // Handler logic
+    }
+}
+```
+
+### Temporary Handler
+
+```kotlin
+fun setupTemporaryHandler() {
+    var count = 0
+    until<GameTickEvent> { event ->
+        count++
+        count >= 100 // Auto-unregister after 100 ticks
+    }
+}
+```
+
+### Multiple Events
+
+```kotlin
+object MultiEventListener : EventListener {
+    private val tickHandler = handler<GameTickEvent> { /* ... */ }
+    private val moveHandler = handler<PlayerMoveEvent> { /* ... */ }
+    private val attackHandler = handler<AttackEntityEvent> { /* ... */ }
+}
+```
+
+## See Also
+
+- [EventManager](/api/event-manager) - Event system core
+- [Event Types](/api/event-types) - All available events
+- [ClientModule](/api/client-module) - Module implementation

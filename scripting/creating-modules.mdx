@@ -1,0 +1,401 @@
+---
+title: Creating Custom Modules
+description: Build custom modules with the LiquidBounce scripting system
+icon: cube
+---
+
+## Overview
+
+Modules are the primary way to add functionality to LiquidBounce. Script modules integrate seamlessly with built-in modules and appear in the ClickGUI, can be bound to keys, and respond to events.
+
+## Basic Module Structure
+
+Use `script.registerModule()` to create a new module:
+
+```javascript
+var script = registerScript({
+    name: "MyScript",
+    version: "1.0.0",
+    authors: ["Developer"]
+});
+
+script.registerModule({
+    name: "ExampleModule",
+    category: "Movement"
+}, function(module) {
+    // Module logic here
+});
+```
+
+## Module Configuration
+
+The first parameter to `registerModule()` is a configuration object:
+
+<ParamField path="name" type="string" required>
+  The display name of the module
+</ParamField>
+
+<ParamField path="category" type="string" required>
+  Module category. Available categories:
+  - `Combat`
+  - `Movement`
+  - `Player`
+  - `World`
+  - `Render`
+  - `Client`
+  - `Exploit`
+  - `Fun`
+  - `Misc`
+</ParamField>
+
+<ParamField path="description" type="string">
+  Optional description shown in the ClickGUI
+</ParamField>
+
+<ParamField path="tag" type="string">
+  Optional tag displayed next to the module name in the ArrayList
+</ParamField>
+
+<ParamField path="settings" type="object">
+  Module settings (values) - see [Module Settings](#module-settings)
+</ParamField>
+
+## Module Settings
+
+Add configurable settings to your module using the `Setting` object:
+
+```javascript
+script.registerModule({
+    name: "SpeedModule",
+    category: "Movement",
+    description: "Increases movement speed",
+    settings: {
+        speed: Setting.float({
+            name: "Speed",
+            default: 1.5,
+            range: [0.1, 5.0],
+            suffix: "x"
+        }),
+        jumpBoost: Setting.boolean({
+            name: "JumpBoost",
+            default: true
+        })
+    }
+}, function(module) {
+    // Access settings
+    var speedValue = module.settings.speed.get();
+    var jumpBoostEnabled = module.settings.jumpBoost.get();
+});
+```
+
+### Available Setting Types
+
+<Tabs>
+  <Tab title="Boolean">
+    ```javascript
+    Setting.boolean({
+        name: "Enabled",
+        default: true
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Integer">
+    ```javascript
+    Setting.int({
+        name: "Delay",
+        default: 100,
+        range: [0, 1000],
+        suffix: "ms"
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Float">
+    ```javascript
+    Setting.float({
+        name: "Speed",
+        default: 1.5,
+        range: [0.1, 5.0],
+        suffix: "x"
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Range (Int)">
+    ```javascript
+    Setting.intRange({
+        name: "MinMax",
+        default: [10, 20],
+        range: [0, 100],
+        suffix: "blocks"
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Range (Float)">
+    ```javascript
+    Setting.floatRange({
+        name: "Distance",
+        default: [3.0, 6.0],
+        range: [1.0, 10.0],
+        suffix: "m"
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Text">
+    ```javascript
+    Setting.text({
+        name: "Message",
+        default: "Hello World"
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Choice">
+    ```javascript
+    Setting.choose({
+        name: "Mode",
+        default: "Legit",
+        choices: ["Legit", "Aggressive", "Bypass"]
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Multi-Choice">
+    ```javascript
+    Setting.multiChoose({
+        name: "Targets",
+        default: ["Players", "Mobs"],
+        choices: ["Players", "Mobs", "Animals"],
+        canBeNone: false
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Keybind">
+    ```javascript
+    Setting.key({
+        name: "BindKey",
+        default: "KEY_R"
+    })
+    ```
+  </Tab>
+</Tabs>
+
+## Module Event Handlers
+
+Handle events within your module using `module.on()`:
+
+```javascript
+script.registerModule({
+    name: "ChatLogger",
+    category: "Misc"
+}, function(module) {
+    
+    module.on("enable", function() {
+        Client.displayChatMessage("§aChatLogger enabled!");
+    });
+    
+    module.on("disable", function() {
+        Client.displayChatMessage("§cChatLogger disabled!");
+    });
+    
+    module.on("chatReceive", function(event) {
+        var message = event.getMessage();
+        Client.displayChatMessage("§7[LOG] " + message);
+    });
+    
+});
+```
+
+### Lifecycle Events
+
+<ResponseField name="enable" type="event">
+  Called when the module is enabled
+</ResponseField>
+
+<ResponseField name="disable" type="event">
+  Called when the module is disabled
+</ResponseField>
+
+<Info>
+See the [Events documentation](/scripting/events) for a complete list of available events.
+</Info>
+
+## Complete Module Example
+
+Here's a fully-featured module that demonstrates various features:
+
+```javascript
+var script = registerScript({
+    name: "AutoSprint",
+    version: "1.0.0",
+    authors: ["Developer"]
+});
+
+script.registerModule({
+    name: "AutoSprint",
+    category: "Movement",
+    description: "Automatically sprints when moving",
+    settings: {
+        mode: Setting.choose({
+            name: "Mode",
+            default: "Legit",
+            choices: ["Legit", "Omni"]
+        }),
+        hungerCheck: Setting.boolean({
+            name: "CheckHunger",
+            default: true
+        }),
+        minHunger: Setting.int({
+            name: "MinHunger",
+            default: 6,
+            range: [0, 20]
+        })
+    }
+}, function(module) {
+    
+    module.on("enable", function() {
+        Client.displayChatMessage("§a[AutoSprint] Enabled");
+    });
+    
+    module.on("disable", function() {
+        if (mc.player) {
+            mc.player.setSprinting(false);
+        }
+        Client.displayChatMessage("§c[AutoSprint] Disabled");
+    });
+    
+    module.on("playerTick", function(event) {
+        var player = mc.player;
+        if (!player) return;
+        
+        var mode = module.settings.mode.get();
+        var checkHunger = module.settings.hungerCheck.get();
+        var minHunger = module.settings.minHunger.get();
+        
+        // Check hunger if enabled
+        if (checkHunger && player.getFoodData().getFoodLevel() < minHunger) {
+            player.setSprinting(false);
+            return;
+        }
+        
+        // Legit mode: only sprint when moving forward
+        if (mode === "Legit") {
+            var movingForward = player.input.getMoveVector().z > 0;
+            if (movingForward) {
+                player.setSprinting(true);
+            }
+        }
+        // Omni mode: sprint in any direction
+        else if (mode === "Omni") {
+            var moving = player.input.getMoveVector().lengthSquared() > 0;
+            if (moving) {
+                player.setSprinting(true);
+            }
+        }
+    });
+    
+    // Update tag with current mode
+    var currentMode = module.settings.mode.get();
+    module.tag = currentMode;
+    
+});
+```
+
+## Accessing Module Instance
+
+The module instance passed to the callback provides several useful members:
+
+<ResponseField name="settings" type="object">
+  Access to all module settings via `module.settings.settingName.get()`
+</ResponseField>
+
+<ResponseField name="tag" type="string">
+  Set or get the module tag: `module.tag = "Value"`
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The module's name (read-only)
+</ResponseField>
+
+<ResponseField name="enabled" type="boolean">
+  Check or set module state: `module.enabled = true`
+</ResponseField>
+
+<ResponseField name="on" type="function">
+  Register event handlers: `module.on("eventName", handler)`
+</ResponseField>
+
+## Advanced Features
+
+### Dynamic Tags
+
+Update the module's ArrayList tag dynamically:
+
+```javascript
+module.on("playerTick", function() {
+    var speed = mc.player.getDeltaMovement().horizontalDistance() * 20;
+    module.tag = speed.toFixed(2) + " b/s";
+});
+```
+
+### Accessing Other Modules
+
+You can interact with other modules:
+
+```javascript
+var killAura = Client.moduleManager.getModule("KillAura");
+if (killAura && killAura.enabled) {
+    // KillAura is enabled
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Clean up on disable">
+    Always reset state when the module is disabled:
+    ```javascript
+    module.on("disable", function() {
+        mc.player.setSprinting(false);
+        // Reset any modified game state
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Null checks">
+    Always check if player/world exists before accessing:
+    ```javascript
+    var player = mc.player;
+    if (!player) return;
+    ```
+  </Accordion>
+
+  <Accordion title="Use appropriate events">
+    Choose the right event for your needs:
+    - `playerTick` for frequent updates
+    - `gameTick` for game logic
+    - Specific events like `packet` for network operations
+  </Accordion>
+
+  <Accordion title="Performance considerations">
+    - Avoid heavy operations in frequent events like `playerTick`
+    - Cache values when possible
+    - Use early returns to skip unnecessary processing
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Working with Events" icon="bolt" href="/scripting/events">
+    Learn about all available events
+  </Card>
+  
+  <Card title="API Reference" icon="book" href="/scripting/api-reference">
+    Explore utility functions and APIs
+  </Card>
+</CardGroup>
