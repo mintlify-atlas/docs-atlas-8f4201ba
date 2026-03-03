@@ -1,0 +1,168 @@
+{
+  "projectType": "general",
+  "projectName": "LiquidBounce",
+  "projectDescription": "A free mixin-based injection hacked client for Minecraft using the Fabric API",
+  "theme": "aspen",
+  "primaryColor": "#0099FF",
+  "lightColor": "#4DB8FF",
+  "darkColor": "#0077CC",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/modules",
+              "concepts/commands",
+              "concepts/configuration",
+              "concepts/scripting"
+            ]
+          },
+          {
+            "group": "Modules",
+            "pages": [
+              "modules/overview",
+              "modules/combat",
+              "modules/movement",
+              "modules/player",
+              "modules/render",
+              "modules/world",
+              "modules/exploit",
+              "modules/misc",
+              "modules/fun"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/accounts",
+              "features/marketplace",
+              "features/cosmetics",
+              "features/themes",
+              "features/friends",
+              "features/macros"
+            ]
+          },
+          {
+            "group": "Scripting",
+            "pages": [
+              "scripting/getting-started",
+              "scripting/creating-modules",
+              "scripting/creating-commands",
+              "scripting/events",
+              "scripting/api-reference"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/auto-config",
+              "advanced/deep-learning",
+              "advanced/integration",
+              "advanced/development"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Module System",
+            "pages": [
+              "api/module-manager",
+              "api/client-module",
+              "api/module-categories"
+            ]
+          },
+          {
+            "group": "Command System",
+            "pages": [
+              "api/command-manager",
+              "api/command-builder",
+              "api/parameters"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/config-system",
+              "api/value-types",
+              "api/auto-config"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api/event-manager",
+              "api/event-listener",
+              "api/event-types"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/rotation-manager",
+              "api/combat-manager",
+              "api/inventory-manager",
+              "api/render-utilities"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Community",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "community/contributing",
+              "community/faq",
+              "community/troubleshooting",
+              "community/support"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Module system with 8 categories (Combat, Movement, Player, Render, World, Exploit, Misc, Fun)",
+    "Advanced scripting API with GraalVM polyglot support",
+    "Configuration system with auto-config and cloud sync",
+    "Custom UI theme system built with Svelte",
+    "Account management with OAuth authentication",
+    "Cosmetics and marketplace integration",
+    "Deep learning integration for AI-powered features",
+    "Event-driven architecture with comprehensive event system",
+    "Rotation and combat management utilities",
+    "Integration with modern Fabric mods (ViaFabricPlus, Sodium, Lithium)"
+  ],
+  "publicApiSurface": [
+    "ClientModule - Base class for creating modules",
+    "ModuleManager - Manages all registered modules",
+    "CommandManager - Handles command registration and execution",
+    "EventManager - Event system for handling game events",
+    "ConfigSystem - Configuration management and persistence",
+    "ScriptManager - Script loading and execution",
+    "RotationManager - Player rotation management",
+    "CombatManager - Combat state tracking",
+    "InventoryManager - Inventory operations",
+    "AccountManager - Minecraft account management",
+    "MarketplaceManager - Script and config marketplace",
+    "CosmeticService - Cosmetic features (capes, etc.)",
+    "ThemeManager - UI theme customization",
+    "AutoConfig - Cloud configuration sync",
+    "ModuleCategories - Module category registry"
+  ]
+}
